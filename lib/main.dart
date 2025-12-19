@@ -1,23 +1,7 @@
 import 'package:flutter/material.dart';
-import 'screens/onboarding_screen.dart';
+import 'package:home_tutor/app.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Home Tutor',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const OnboardingScreen(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
