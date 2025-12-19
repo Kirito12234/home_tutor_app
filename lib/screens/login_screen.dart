@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart';
-import 'auth_placeholder_screen.dart';
+import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -124,9 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const AuthPlaceholderScreen(
-                                  title: 'Welcome Back',
-                                ),
+                                builder: (_) => const DashboardScreen(),
                               ),
                             );
                           },
