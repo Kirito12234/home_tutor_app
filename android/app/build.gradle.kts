@@ -8,7 +8,8 @@ plugins {
 android {
     namespace = "com.shreedhar.batch35c.home_tutor"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // NDK version is optional - only needed if using native code
+    // ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
