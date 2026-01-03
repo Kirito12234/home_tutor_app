@@ -1,11 +1,11 @@
 {
-    "name": "home_tutor",
-    "short_name": "home_tutor",
+    "name": "Home Tutor",
+    "short_name": "Home Tutor",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#3366FF",
+    "theme_color": "#3366FF",
+    "description": "Home Tutor - Learn and grow with personalized courses",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

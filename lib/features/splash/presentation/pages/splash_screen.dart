@@ -12,15 +12,18 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const OnboardingScreen(),
-        ),
-      );
-    });
+    _handleNavigation();
+  }
+
+  Future<void> _handleNavigation() async {
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const OnboardingScreen(),
+      ),
+    );
   }
 
   @override
@@ -79,8 +82,6 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-
-
 
 
 
