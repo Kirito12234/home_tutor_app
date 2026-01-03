@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class MachineLearningCourseScreen extends StatelessWidget {
-  const MachineLearningCourseScreen({super.key});
+class JavaCourseScreen extends StatelessWidget {
+  const JavaCourseScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Machine Learning'),
+        title: const Text('Java Programming'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.psychology_rounded,
+              Icons.code_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Machine Learning',
+              'Java Programming',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class MachineLearningCourseScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Learn AI and machine learning concepts',
+              'Learn Java from basics to advanced',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class MachineLearningCourseScreen extends StatelessWidget {
     );
   }
 }
+
 

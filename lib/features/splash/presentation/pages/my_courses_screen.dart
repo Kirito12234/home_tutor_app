@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class JavaCourseScreen extends StatelessWidget {
-  const JavaCourseScreen({super.key});
+class MyCoursesScreen extends StatelessWidget {
+  const MyCoursesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Java Programming'),
+        title: const Text('My Courses'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.code_rounded,
+              Icons.menu_book_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Java Programming',
+              'My Courses',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class JavaCourseScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Learn Java from basics to advanced',
+              'Your enrolled courses will appear here',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class JavaCourseScreen extends StatelessWidget {
     );
   }
 }
+
 

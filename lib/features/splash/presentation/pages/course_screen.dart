@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class PaintingCourseScreen extends StatelessWidget {
-  const PaintingCourseScreen({super.key});
+class CourseScreen extends StatelessWidget {
+  const CourseScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Painting'),
+        title: const Text('Course'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.palette_rounded,
+              Icons.menu_book_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Painting',
+              'Course',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class PaintingCourseScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Learn painting techniques and art',
+              'Browse all available courses',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class PaintingCourseScreen extends StatelessWidget {
     );
   }
 }
+
 

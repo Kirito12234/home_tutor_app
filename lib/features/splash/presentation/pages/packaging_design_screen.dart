@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class ReactCourseScreen extends StatelessWidget {
-  const ReactCourseScreen({super.key});
+class PackagingDesignScreen extends StatelessWidget {
+  const PackagingDesignScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('React Development'),
+        title: const Text('Packaging Design'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.developer_mode_rounded,
+              Icons.design_services_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'React Development',
+              'Packaging Design',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class ReactCourseScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Build modern web applications with React',
+              'Progress: 40/48 lessons completed',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class ReactCourseScreen extends StatelessWidget {
     );
   }
 }
+
 

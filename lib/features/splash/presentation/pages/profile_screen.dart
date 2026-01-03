@@ -1,26 +1,30 @@
 import 'package:flutter/material.dart';
 
-class GetStartedScreen extends StatelessWidget {
-  const GetStartedScreen({super.key});
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Get Started'),
+        title: const Text('Profile'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.school_rounded,
-              size: 64,
-              color: Color(0xFFFF7043),
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: Color(0xFF3366FF),
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.white,
+              ),
             ),
             SizedBox(height: 16),
             Text(
-              'Get Started',
+              'Siddharth',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +32,7 @@ class GetStartedScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Start your learning journey today!',
+              'siddharth@example.com',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +44,5 @@ class GetStartedScreen extends StatelessWidget {
     );
   }
 }
+
 

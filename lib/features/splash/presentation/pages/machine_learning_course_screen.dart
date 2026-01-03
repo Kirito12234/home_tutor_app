@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class ProductDesignScreen extends StatelessWidget {
-  const ProductDesignScreen({super.key});
+class MachineLearningCourseScreen extends StatelessWidget {
+  const MachineLearningCourseScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Product Design'),
+        title: const Text('Machine Learning'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.palette_rounded,
+              Icons.psychology_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Product Design',
+              'Machine Learning',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class ProductDesignScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Progress: 6/24 lessons completed',
+              'Learn AI and machine learning concepts',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class ProductDesignScreen extends StatelessWidget {
     );
   }
 }
+
 

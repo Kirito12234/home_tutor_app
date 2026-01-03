@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class WebDevelopmentCourseScreen extends StatelessWidget {
-  const WebDevelopmentCourseScreen({super.key});
+class MessageScreen extends StatelessWidget {
+  const MessageScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Web Development'),
+        title: const Text('Message'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.web_rounded,
+              Icons.message_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Web Development',
+              'Message',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class WebDevelopmentCourseScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Learn HTML, CSS, JavaScript and more',
+              'Your messages will appear here',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class WebDevelopmentCourseScreen extends StatelessWidget {
     );
   }
 }
+
 

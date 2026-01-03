@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class PackagingDesignScreen extends StatelessWidget {
-  const PackagingDesignScreen({super.key});
+class HelpSupportScreen extends StatelessWidget {
+  const HelpSupportScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Packaging Design'),
+        title: const Text('Help & Support'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.design_services_rounded,
+              Icons.help_outline,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Packaging Design',
+              'Help & Support',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,11 +28,12 @@ class PackagingDesignScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Progress: 40/48 lessons completed',
+              'Get help and support for your questions',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -40,4 +41,5 @@ class PackagingDesignScreen extends StatelessWidget {
     );
   }
 }
+
 

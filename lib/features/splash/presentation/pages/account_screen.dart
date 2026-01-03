@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Account'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.settings,
+              Icons.person_outline_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Settings',
+              'Account',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Configure your app settings',
+              'Manage your account settings',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+
 

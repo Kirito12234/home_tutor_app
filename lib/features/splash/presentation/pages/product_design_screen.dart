@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class MeetupScreen extends StatelessWidget {
-  const MeetupScreen({super.key});
+class ProductDesignScreen extends StatelessWidget {
+  const ProductDesignScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Meetup'),
+        title: const Text('Product Design'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.groups_rounded,
+              Icons.palette_rounded,
               size: 64,
-              color: Color(0xFF7E57C2),
+              color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Meetup',
+              'Product Design',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,12 +28,11 @@ class MeetupScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Off-line exchange of learning experience',
+              'Progress: 6/24 lessons completed',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -41,4 +40,5 @@ class MeetupScreen extends StatelessWidget {
     );
   }
 }
+
 

@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class HelpSupportScreen extends StatelessWidget {
-  const HelpSupportScreen({super.key});
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Help & Support'),
+        title: const Text('Settings'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.help_outline,
+              Icons.settings,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Help & Support',
+              'Settings',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,12 +28,11 @@ class HelpSupportScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Get help and support for your questions',
+              'Configure your app settings',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -41,4 +40,5 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 }
+
 

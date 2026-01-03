@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
-class AccountScreen extends StatelessWidget {
-  const AccountScreen({super.key});
+class SearchScreen extends StatelessWidget {
+  const SearchScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Account'),
+        title: const Text('Search'),
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.person_outline_rounded,
+              Icons.search_rounded,
               size: 64,
               color: Color(0xFF3366FF),
             ),
             SizedBox(height: 16),
             Text(
-              'Account',
+              'Search',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -28,7 +28,7 @@ class AccountScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Manage your account settings',
+              'Search for courses, topics, and more',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -40,4 +40,5 @@ class AccountScreen extends StatelessWidget {
     );
   }
 }
+
 
