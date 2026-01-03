@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../auth/data/datasources/local/auth_local_datasource.dart';
+import '../../../auth/data/repositories/auth_repository_impl.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -12,12 +15,40 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _agreeToTerms = false;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final AuthProvider _authProvider =
+      AuthProvider(AuthRepositoryImpl(AuthLocalDataSource()));
 
-  void _openPlaceholder() {
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSignUp() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final error = await _authProvider.signUp(
+      name: '',
+      email: email,
+      password: password,
+    );
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account created successfully.')),
+    );
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const DashboardScreen(),
+        builder: (_) => const LoginScreen(),
       ),
     );
   }
@@ -62,6 +93,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       TextField(
+                        controller: _emailController,
                         decoration: InputDecoration(
                           labelText: 'Email',
                           hintText: 'example@gmail.com',
@@ -82,6 +114,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       const SizedBox(height: 20),
                       TextField(
+                        controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           labelText: 'Password',
@@ -116,7 +149,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _agreeToTerms ? _openPlaceholder : null,
+                          onPressed: _agreeToTerms ? _handleSignUp : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             disabledBackgroundColor: Colors.grey[300],
