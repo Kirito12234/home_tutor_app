@@ -8,5 +8,9 @@ class AssetPaths {
   static const String googleIcon = 'assets/icons/google.svg';
   static const String facebookIcon = 'assets/icons/facebook.svg';
   static const String successIcon = 'assets/icons/success.svg';
+  
+  // Empty State Images
+  static const String emptyNoVideos = 'assets/images/empty_no_videos.png';
+  static const String emptyNoProducts = 'assets/images/empty_no_products.png';
 }
 

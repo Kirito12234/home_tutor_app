@@ -21,6 +21,8 @@ import '../features/account/presentation/pages/account_page.dart';
 import '../features/notifications/presentation/pages/notifications_page.dart';
 import '../features/notifications/presentation/pages/no_notifications_page.dart';
 import '../features/notifications/presentation/pages/no_network_page.dart';
+import '../features/empty_states/presentation/pages/no_videos_page.dart';
+import '../features/empty_states/presentation/pages/no_products_page.dart';
 
 class App extends StatelessWidget {
   const App({Key? key}) : super(key: key);
@@ -95,6 +97,10 @@ class App extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const NoNotificationsPage());
           case AppRoutes.noNetwork:
             return MaterialPageRoute(builder: (_) => const NoNetworkPage());
+          case AppRoutes.noVideos:
+            return MaterialPageRoute(builder: (_) => const NoVideosPage());
+          case AppRoutes.noProducts:
+            return MaterialPageRoute(builder: (_) => const NoProductsPage());
           default:
             return MaterialPageRoute(builder: (_) => const LoginPage());
         }

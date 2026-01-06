@@ -18,5 +18,7 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String noNotifications = '/no-notifications';
   static const String noNetwork = '/no-network';
+  static const String noVideos = '/no-videos';
+  static const String noProducts = '/no-products';
 }
 
