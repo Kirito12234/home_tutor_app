@@ -30,10 +30,57 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _onLogin() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+  Future<void> _onLogin() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiClient.postJson(
+        '/api/v1/auth/login',
+        body: {
+          'emailOrPhone': _emailController.text.trim(),
+          'password': _passwordController.text,
+        },
+      );
+
+      final token = response['token']?.toString();
+      if (token != null && token.isNotEmpty) {
+        await HiveService.setAuthToken(token);
+      }
+
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    } on HttpException catch (err) {
+      _showError(err.message);
+    } catch (_) {
+      _showError('Unable to log in. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _errorMessage = message;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
