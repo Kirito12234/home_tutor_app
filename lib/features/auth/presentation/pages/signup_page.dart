@@ -3,6 +3,8 @@ import '../../../../../app/routes/app_routes.dart';
 import '../../../../../app/theme/app_colors.dart';
 import '../../../../../core/widgets/app_text_field.dart';
 import '../../../../../core/widgets/primary_button.dart';
+import '../../../../../core/services/api/api_client.dart';
+import '../../../../../core/services/hive/hive_service.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({Key? key}) : super(key: key);
@@ -17,8 +19,11 @@ class _SignUpPageState extends State<SignUpPage> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final ApiClient _apiClient = ApiClient();
   bool _obscurePassword = true;
   bool _agreeToTerms = false;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -29,11 +34,66 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  void _onSignUp() {
-    if (_formKey.currentState!.validate() && _agreeToTerms) {
-      // Navigate to next screen or handle signup
-      Navigator.of(context).pushNamed(AppRoutes.phoneContinue);
+  Future<void> _onSignUp() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
+    if (!_agreeToTerms) {
+      _showError('Please agree to the Terms & Conditions.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiClient.postJson(
+        '/api/v1/auth/register',
+        body: {
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phone': _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+          'password': _passwordController.text,
+          'role': 'student',
+        },
+      );
+
+      final token = response['token']?.toString();
+      if (token != null && token.isNotEmpty) {
+        await HiveService.setAuthToken(token);
+      }
+
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pushNamed(AppRoutes.success);
+    } on HttpException catch (err) {
+      _showError(err.message);
+    } catch (_) {
+      _showError('Unable to sign up. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _errorMessage = message;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -178,7 +238,19 @@ class _SignUpPageState extends State<SignUpPage> {
                 PrimaryButton(
                   text: 'Creat account',
                   onPressed: _onSignUp,
+                  isLoading: _isLoading,
                 ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 Center(
                   child: Row(
