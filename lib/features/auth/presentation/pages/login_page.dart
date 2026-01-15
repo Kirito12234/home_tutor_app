@@ -116,11 +116,11 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 40),
                 AppTextField(
                   controller: _emailController,
-                  hintText: 'Email',
+                  hintText: 'Email or phone',
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
+                      return 'Please enter your email or phone';
                     }
                     return null;
                   },
@@ -171,6 +171,17 @@ class _LoginPageState extends State<LoginPage> {
                   onPressed: _onLogin,
                   isLoading: _isLoading,
                 ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 Row(
                   children: [
