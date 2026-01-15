@@ -236,7 +236,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 const SizedBox(height: 32),
                 PrimaryButton(
-                  text: 'Creat account',
+                  text: 'Create account',
                   onPressed: _onSignUp,
                   isLoading: _isLoading,
                 ),
