@@ -4,6 +4,8 @@ import '../../../../../app/theme/app_colors.dart';
 import '../../../../../core/widgets/app_text_field.dart';
 import '../../../../../core/widgets/primary_button.dart';
 import '../../../../../core/widgets/social_button.dart';
+import '../../../../../core/services/api/api_client.dart';
+import '../../../../../core/services/hive/hive_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -16,7 +18,10 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final ApiClient _apiClient = ApiClient();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -117,6 +122,7 @@ class _LoginPageState extends State<LoginPage> {
                 PrimaryButton(
                   text: 'Log In',
                   onPressed: _onLogin,
+                  isLoading: _isLoading,
                 ),
                 const SizedBox(height: 32),
                 Row(
