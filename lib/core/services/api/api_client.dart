@@ -12,7 +12,12 @@ class ApiClient {
   Uri _uri(String path) {
     final base = apiBaseUrl();
     final normalized = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$base$normalized');
+    final baseHasApi = base.endsWith('/api/v1');
+    final pathHasApi = normalized.startsWith('/api/v1/');
+    final effectivePath = baseHasApi && pathHasApi
+        ? normalized.substring('/api/v1'.length)
+        : normalized;
+    return Uri.parse('$base$effectivePath');
   }
 
   Future<Map<String, dynamic>> getJson(
@@ -35,6 +40,49 @@ class ApiClient {
       _uri(path),
       headers: _headers(token),
       body: jsonEncode(body ?? const {}),
+    );
+    return _decodeJson(response);
+  }
+
+  Future<Map<String, dynamic>> putJson(
+    String path, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    final response = await _client.put(
+      _uri(path),
+      headers: _headers(token),
+      body: jsonEncode(body ?? const {}),
+    );
+    return _decodeJson(response);
+  }
+
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    Map<String, String>? fields,
+    List<http.MultipartFile>? files,
+    String? token,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
+    if (files != null) {
+      request.files.addAll(files);
+    }
+    request.headers.addAll(_headers(token));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    return _decodeJson(response);
+  }
+
+  Future<Map<String, dynamic>> deleteJson(
+    String path, {
+    String? token,
+  }) async {
+    final response = await _client.delete(
+      _uri(path),
+      headers: _headers(token),
     );
     return _decodeJson(response);
   }

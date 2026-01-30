@@ -1,11 +1,34 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/constants/user_display_name.dart';
+import '../../../../core/services/hive/hive_service.dart';
+import '../../../../core/services/profile/user_profile_service.dart';
+import '../../../../core/widgets/profile_avatar.dart';
 
-class HeaderGreeting extends StatelessWidget {
+class HeaderGreeting extends StatefulWidget {
   const HeaderGreeting({Key? key}) : super(key: key);
 
   @override
+  State<HeaderGreeting> createState() => _HeaderGreetingState();
+}
+
+class _HeaderGreetingState extends State<HeaderGreeting> {
+  final UserProfileService _profileService = UserProfileService();
+  bool _didLoad = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didLoad) {
+      return;
+    }
+    _didLoad = true;
+    _profileService.refreshUserCache();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final displayName = displayNameFromUser(HiveService.currentUserName);
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
       decoration: const BoxDecoration(
@@ -22,9 +45,9 @@ class HeaderGreeting extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Hi, Shreedhar',
-                  style: TextStyle(
+                Text(
+                  'Hi, $displayName',
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: AppColors.buttonText,
@@ -43,18 +66,10 @@ class HeaderGreeting extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.buttonText,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.person,
-              color: AppColors.primary,
-              size: 30,
-            ),
+          ProfileAvatar(
+            size: 50,
+            backgroundColor: AppColors.buttonText,
+            iconColor: AppColors.primary,
           ),
         ],
       ),

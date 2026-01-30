@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/constants/user_display_name.dart';
+import '../../../../core/services/api/api_client.dart';
+import '../../../../core/services/hive/hive_service.dart';
+import '../../../../core/services/profile/user_profile_service.dart';
+import '../../../../core/widgets/file_picker_screen.dart';
+import '../../../../core/widgets/profile_avatar.dart';
 import '../../../dashboard/presentation/widgets/bottom_nav.dart';
 
 class AccountPage extends StatefulWidget {
@@ -12,12 +18,15 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage> {
   int _currentNavIndex = 4;
+  final UserProfileService _profileService = UserProfileService();
+  bool _isUploadingAvatar = false;
 
   final List<Map<String, dynamic>> _menuItems = [
-    {'title': 'Favourite', 'icon': Icons.visibility_off_outlined},
-    {'title': 'Edit Account', 'icon': Icons.visibility_off_outlined},
-    {'title': 'Settings and Privacy', 'icon': Icons.visibility_off_outlined},
-    {'title': 'Help', 'icon': Icons.visibility_off_outlined},
+    {'title': 'Edit Profile', 'icon': Icons.edit},
+    {'title': 'Favourite', 'icon': Icons.favorite_border},
+    {'title': 'Settings and Privacy', 'icon': Icons.settings},
+    {'title': 'Help', 'icon': Icons.help_outline},
+    {'title': 'Logout', 'icon': Icons.logout},
   ];
 
   void _onNavTap(int index) {
@@ -40,107 +49,340 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
+  Future<bool> _handleBack() async {
+    Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    return false;
+  }
+
+  Future<void> _showEditProfileDialog() async {
+    final controller = TextEditingController(
+      text: HiveService.currentUserName ?? '',
+    );
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Profile'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Full name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(controller.text.trim());
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+    if (newName != null && newName.isNotEmpty) {
+      await HiveService.setCurrentUserName(newName);
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    await HiveService.setAuthToken(null);
+    await HiveService.setCurrentUserName(null);
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.login,
+      (route) => false,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshProfileFromServer();
+  }
+
+  Future<void> _refreshProfileFromServer() async {
+    try {
+      await _profileService.refreshUserCache();
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Account',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Inter',
+    final displayName = displayNameFromUser(HiveService.currentUserName);
+    return WillPopScope(
+      onWillPop: _handleBack,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Account',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 32),
-                  Center(
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: AppColors.categoryBlue,
-                            shape: BoxShape.circle,
+                    const SizedBox(height: 32),
+                    Center(
+                      child: Stack(
+                        children: [
+                          ProfileAvatar(
+                            size: 100,
+                            onTap: _isUploadingAvatar ? null : _showAvatarOptions,
                           ),
-                          child: const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: _isUploadingAvatar
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(8),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation(
+                                          AppColors.buttonText,
+                                        ),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.camera_alt,
+                                      color: AppColors.buttonText,
+                                      size: 16,
+                                    ),
                             ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: AppColors.buttonText,
-                              size: 16,
-                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
-                  ..._menuItems.map((item) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          item['title']!,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textPrimary,
-                            fontFamily: 'Inter',
-                          ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Text(
+                        displayName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                          fontFamily: 'Inter',
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    ..._menuItems.map((item) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            item['title']!,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: AppColors.textPrimary,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
                         trailing: Icon(
                           item['icon'] as IconData,
                           color: AppColors.textSecondary,
                           size: 20,
                         ),
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('${item['title']} tapped')),
-                          );
+                          switch (item['title']) {
+                            case 'Edit Profile':
+                              _showEditProfileDialog();
+                              break;
+                            case 'Favourite':
+                              Navigator.of(context).pushNamed(AppRoutes.favourites);
+                              break;
+                            case 'Settings and Privacy':
+                              Navigator.of(context).pushNamed(AppRoutes.settingsPrivacy);
+                              break;
+                            case 'Help':
+                              Navigator.of(context).pushNamed(AppRoutes.help);
+                              break;
+                            case 'Logout':
+                              _logout();
+                              break;
+                            default:
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${item['title']} tapped'),
+                                ),
+                              );
+                          }
                         },
                       ),
                     );
-                  }),
-                ],
+                    }),
+                  ],
+                ),
               ),
             ),
-          ),
-          BottomNav(
-            currentIndex: _currentNavIndex,
-            onTap: _onNavTap,
-          ),
-        ],
+            BottomNav(
+              currentIndex: _currentNavIndex,
+              onTap: _onNavTap,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Future<void> _showAvatarOptions() async {
+    final hasAvatar = HiveService.currentUserAvatarUrl != null;
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('Change photo'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _pickAndUploadAvatar();
+                  },
+                ),
+                if (hasAvatar)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('Remove photo'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _removeAvatar();
+                    },
+                  ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final selected = await Navigator.of(context).push<SelectedFile>(
+      MaterialPageRoute(
+        builder: (_) => const FilePickerScreen(
+          title: 'Select a photo',
+          allowPdf: false,
+          allowAny: false,
+          allowImages: true,
+          allowCamera: true,
+        ),
+      ),
+    );
+    if (selected == null) {
+      return;
+    }
+    if (!_isImageFile(selected)) {
+      _showSnack('Please select an image file.');
+      return;
+    }
+    await _uploadAvatar(selected);
+  }
+
+  bool _isImageFile(SelectedFile file) {
+    final name = file.name.toLowerCase();
+    return name.endsWith('.jpg') ||
+        name.endsWith('.jpeg') ||
+        name.endsWith('.png') ||
+        name.endsWith('.webp') ||
+        name.endsWith('.gif');
+  }
+
+  Future<void> _uploadAvatar(SelectedFile file) async {
+    setState(() {
+      _isUploadingAvatar = true;
+    });
+    try {
+      await _profileService.uploadAvatar(file);
+      if (mounted) {
+        _showSnack('Profile photo updated.');
+      }
+    } on HttpException catch (err) {
+      _showSnack(err.message);
+    } catch (_) {
+      _showSnack('Unable to update profile photo.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAvatar = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    setState(() {
+      _isUploadingAvatar = true;
+    });
+    try {
+      await _profileService.deleteAvatar();
+      if (mounted) {
+        _showSnack('Profile photo removed.');
+      }
+    } on HttpException catch (err) {
+      _showSnack(err.message);
+    } catch (_) {
+      _showSnack('Unable to remove profile photo.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAvatar = false;
+        });
+      }
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }

@@ -28,12 +28,10 @@ class _FilterSheetState extends State<FilterSheet> {
   late RangeValues _priceRange;
 
   final List<String> _categories = [
-    'Design',
-    'painting',
+    'Visual identity',
+    'Painting',
     'Coding',
-    'Music',
-    'Visual identiy',
-    'Mathmatics',
+    'Writing',
   ];
 
   final List<String> _durations = [
@@ -49,7 +47,7 @@ class _FilterSheetState extends State<FilterSheet> {
     super.initState();
     _selectedCategories = List.from(widget.selectedCategories);
     _selectedDuration = widget.selectedDuration;
-    _priceRange = widget.priceRange ?? const RangeValues(10000, 50000);
+    _priceRange = widget.priceRange ?? const RangeValues(0, 100000);
   }
 
   void _toggleCategory(String category) {
@@ -72,8 +70,10 @@ class _FilterSheetState extends State<FilterSheet> {
     setState(() {
       _selectedCategories.clear();
       _selectedDuration = null;
-      _priceRange = const RangeValues(10000, 50000);
+      _priceRange = const RangeValues(0, 100000);
     });
+    widget.onApply(_selectedCategories, _selectedDuration, _priceRange);
+    Navigator.of(context).pop();
   }
 
   void _applyFilters() {
@@ -183,6 +183,7 @@ class _FilterSheetState extends State<FilterSheet> {
                   PriceRangeSlider(
                     minPrice: 0,
                     maxPrice: 100000,
+                    initialRange: _priceRange,
                     onChanged: (values) {
                       setState(() {
                         _priceRange = values;

@@ -4,12 +4,14 @@ import '../../../../app/theme/app_colors.dart';
 class PriceRangeSlider extends StatefulWidget {
   final double minPrice;
   final double maxPrice;
+  final RangeValues? initialRange;
   final ValueChanged<RangeValues>? onChanged;
 
   const PriceRangeSlider({
     Key? key,
     this.minPrice = 0,
     this.maxPrice = 100000,
+    this.initialRange,
     this.onChanged,
   }) : super(key: key);
 
@@ -23,7 +25,15 @@ class _PriceRangeSliderState extends State<PriceRangeSlider> {
   @override
   void initState() {
     super.initState();
-    _values = RangeValues(widget.minPrice, widget.maxPrice);
+    _values = widget.initialRange ?? RangeValues(widget.minPrice, widget.maxPrice);
+  }
+  
+  @override
+  void didUpdateWidget(covariant PriceRangeSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialRange != null && widget.initialRange != oldWidget.initialRange) {
+      _values = widget.initialRange!;
+    }
   }
 
   String _formatPrice(double price) {

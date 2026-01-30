@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/services/api/api_client.dart';
+import '../../../../core/services/hive/hive_service.dart';
 import '../widgets/my_courses_header.dart';
 import '../widgets/course_progress_tile.dart';
 import '../../../dashboard/presentation/widgets/bottom_nav.dart';
-import '../../../courses/data/dummy/dummy_courses.dart';
+import '../../../courses/domain/entities/course.dart';
+import '../../../dashboard/domain/entities/lesson.dart';
 
 class MyCoursesPage extends StatefulWidget {
   const MyCoursesPage({Key? key}) : super(key: key);
@@ -15,51 +18,114 @@ class MyCoursesPage extends StatefulWidget {
 
 class _MyCoursesPageState extends State<MyCoursesPage> {
   int _currentNavIndex = 0;
+  final ApiClient _apiClient = ApiClient();
+  bool _isLoading = false;
+  String? _errorMessage;
 
-  final List<Map<String, dynamic>> _courses = [
-    {
-      'title': 'Product Design v1.0',
-      'completed': 14,
-      'total': 24,
-      'cardColor': AppColors.favoriteOrangeLight,
-      'progressColor': AppColors.durationOrange,
-    },
-    {
-      'title': 'Java Development',
-      'completed': 12,
-      'total': 18,
-      'cardColor': AppColors.categoryBlue,
-      'progressColor': AppColors.primary,
-    },
-    {
-      'title': 'Visual Design',
-      'completed': 10,
-      'total': 16,
-      'cardColor': const Color(0xFFE0F7FA),
-      'progressColor': const Color(0xFF00ACC1),
-    },
-    {
-      'title': 'Mathmatics',
-      'completed': 12,
-      'total': 18,
-      'cardColor': AppColors.categoryBlue,
-      'progressColor': AppColors.primary,
-    },
-    {
-      'title': 'web development',
-      'completed': 10,
-      'total': 16,
-      'cardColor': AppColors.categoryBlue,
-      'progressColor': AppColors.primary,
-    },
-    {
-      'title': 'networking',
-      'completed': 10,
-      'total': 16,
-      'cardColor': AppColors.categoryBlue,
-      'progressColor': AppColors.primary,
-    },
-  ];
+  final List<Map<String, dynamic>> _courses = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEnrollments();
+  }
+
+  Future<void> _loadEnrollments() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiClient.getJson(
+        '/api/v1/enrollments',
+        token: HiveService.authToken,
+      );
+      final data = response['data'];
+      if (data is List) {
+        final colors = [
+          AppColors.favoriteOrangeLight,
+          AppColors.categoryBlue,
+          AppColors.backgroundLight,
+          AppColors.categoryBeige,
+        ];
+        final progressColors = [
+          AppColors.durationOrange,
+          AppColors.primary,
+          AppColors.primary,
+          AppColors.durationOrange,
+        ];
+        final mapped = <Map<String, dynamic>>[];
+        for (var i = 0; i < data.length; i++) {
+          final enrollment = data[i];
+          if (enrollment is! Map<String, dynamic>) {
+            continue;
+          }
+          final course = enrollment['course'];
+          final courseMap = course is Map<String, dynamic> ? course : <String, dynamic>{};
+          final lessonCount = courseMap['lessonCount'];
+          final total = lessonCount is num && lessonCount > 0 ? lessonCount.toInt() : 1;
+          final progressPercent = enrollment['progressPercent'];
+          final progressValue = progressPercent is num ? progressPercent.toDouble() : 0.0;
+          final completed = ((progressValue / 100) * total).round();
+          final courseEntity = _mapCourse(courseMap);
+
+          mapped.add({
+            'title': courseEntity.title,
+            'completed': completed,
+            'total': total,
+            'cardColor': colors[i % colors.length],
+            'progressColor': progressColors[i % progressColors.length],
+            'course': courseEntity,
+          });
+        }
+        setState(() {
+          _courses
+            ..clear()
+            ..addAll(mapped);
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Unexpected response format.';
+        });
+      }
+    } on HttpException catch (err) {
+      setState(() {
+        _errorMessage = err.message;
+      });
+    } catch (_) {
+      setState(() {
+        _errorMessage = 'Unable to load enrollments.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Course _mapCourse(Map<String, dynamic> course) {
+    final tutor = course['tutor'];
+    final tutorName =
+        tutor is Map<String, dynamic> ? tutor['name']?.toString() : null;
+    return Course(
+      id: course['_id']?.toString() ?? course['id']?.toString() ?? 'course',
+      title: course['title']?.toString() ?? 'Course',
+      instructor: course['instructorName']?.toString() ?? tutorName ?? 'Instructor',
+      price: (course['price'] as num?)?.toDouble() ?? 0,
+      durationHours: (course['durationHours'] as num?)?.toInt() ?? 0,
+      lessonCount: (course['lessonCount'] as num?)?.toInt() ?? 0,
+      category: course['category']?.toString() ?? 'General',
+      imageUrl: course['imageUrl']?.toString(),
+      description: course['description']?.toString() ?? '',
+      isBestseller: course['isBestseller'] == true,
+      isPopular: course['isPopular'] == true,
+      isNew: course['isNew'] == true,
+      lessons: const <Lesson>[],
+    );
+  }
 
   void _onNavTap(int index) {
     setState(() {
@@ -105,40 +171,53 @@ class _MyCoursesPageState extends State<MyCoursesPage> {
       body: Column(
         children: [
           const MyCoursesHeader(),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.85,
+          if (_isLoading)
+            const Expanded(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_errorMessage != null)
+            Expanded(
+              child: Center(
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.redAccent,
+                    fontFamily: 'Inter',
+                  ),
+                ),
               ),
-              itemCount: _courses.length,
-              itemBuilder: (context, index) {
-                final course = _courses[index];
-                return CourseProgressTile(
-                  title: course['title'] as String,
-                  completed: course['completed'] as int,
-                  total: course['total'] as int,
-                  cardColor: course['cardColor'] as Color,
-                  progressColor: course['progressColor'] as Color,
-                  onTap: () {
-                    // Get the first course from dummy data that matches the title
-                    final allCourses = DummyCourses.getCourses();
-                    final matchingCourse = allCourses.firstWhere(
-                      (c) => c.title.toLowerCase() == (course['title'] as String).toLowerCase(),
-                      orElse: () => allCourses.first,
-                    );
-                    Navigator.of(context).pushNamed(
-                      AppRoutes.courseDetail,
-                      arguments: matchingCourse,
-                    );
-                  },
-                );
-              },
+            )
+          else
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.85,
+                ),
+                itemCount: _courses.length,
+                itemBuilder: (context, index) {
+                  final course = _courses[index];
+                  return CourseProgressTile(
+                    title: course['title'] as String,
+                    completed: course['completed'] as int,
+                    total: course['total'] as int,
+                    cardColor: course['cardColor'] as Color,
+                    progressColor: course['progressColor'] as Color,
+                    onTap: () {
+                      final matchingCourse = course['course'] as Course;
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.courseDetail,
+                        arguments: matchingCourse,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
           BottomNav(
             currentIndex: _currentNavIndex,
             onTap: _onNavTap,

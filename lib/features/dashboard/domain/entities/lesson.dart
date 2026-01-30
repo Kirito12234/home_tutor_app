@@ -5,6 +5,8 @@ class Lesson {
   final bool isCompleted;
   final bool isLocked;
   final int order;
+  final String? imageUrl;
+  final String? pdfUrl;
 
   Lesson({
     required this.id,
@@ -13,6 +15,8 @@ class Lesson {
     this.isCompleted = false,
     this.isLocked = false,
     required this.order,
+    this.imageUrl,
+    this.pdfUrl,
   });
 }
 

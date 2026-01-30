@@ -38,5 +38,17 @@ class AppColors {
   static const Color favoriteOrangeLight = Color(0xFFFFF0EB);
   static const Color headerPink = Color(0xFFFFE5D9);
   static const Color thumbnailGray = Color(0xFFD1D1D6);
+
+  // Teacher theme colors
+  static const Color teacherPrimary = Color(0xFF0F6D6A);
+  static const Color teacherPrimaryDark = Color(0xFF0B4F4D);
+  static const Color teacherAccent = Color(0xFFE0B25C);
+  static const Color teacherBackground = Color(0xFFF6F5F2);
+  static const Color teacherSurface = Color(0xFFFFFFFF);
+  static const Color teacherSurfaceAlt = Color(0xFFF0EFEA);
+  static const Color teacherChip = Color(0xFFE7F2F1);
+  static const Color teacherMuted = Color(0xFF6B7280);
+  static const Color teacherGradientStart = Color(0xFF0F6D6A);
+  static const Color teacherGradientEnd = Color(0xFF1F8F86);
 }
 

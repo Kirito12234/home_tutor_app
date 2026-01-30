@@ -6,12 +6,14 @@ class LessonListItem extends StatelessWidget {
   final Lesson lesson;
   final bool isPlaying;
   final VoidCallback? onTap;
+  final VoidCallback? onMaterialsTap;
 
   const LessonListItem({
     Key? key,
     required this.lesson,
     this.isPlaying = false,
     this.onTap,
+    this.onMaterialsTap,
   }) : super(key: key);
 
   String _formatDurationShort(int minutes) {
@@ -25,6 +27,7 @@ class LessonListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasMaterials = lesson.imageUrl != null || lesson.pdfUrl != null;
     return GestureDetector(
       onTap: lesson.isLocked ? null : onTap,
       child: Container(
@@ -76,6 +79,30 @@ class LessonListItem extends StatelessWidget {
                           Icons.check_circle,
                           size: 14,
                           color: AppColors.durationOrange,
+                        ),
+                      ],
+                      if (hasMaterials) ...[
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: lesson.isLocked ? null : onMaterialsTap,
+                          child: Row(
+                            children: const [
+                              Icon(
+                                Icons.attachment,
+                                size: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Materials',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ],

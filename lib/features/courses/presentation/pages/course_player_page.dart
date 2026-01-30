@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/services/api/api_client.dart';
+import '../../../../core/services/hive/hive_service.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../domain/entities/course.dart';
 import '../widgets/lesson_list_item.dart';
@@ -14,7 +17,11 @@ class CoursePlayerPage extends StatefulWidget {
 
 class _CoursePlayerPageState extends State<CoursePlayerPage> {
   bool _isPlaying = false;
-  double _progress = 0.4; // 4:10 / 6:10
+  double _progress = 0.0;
+  int _lastRecordedMinutes = 0;
+  final ApiClient _apiClient = ApiClient();
+  Course? _activeCourse;
+  Lesson? _activeLesson;
 
   String formatTime(int seconds) {
     final minutes = seconds ~/ 60;
@@ -27,6 +34,40 @@ class _CoursePlayerPageState extends State<CoursePlayerPage> {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',
     )}';
+  }
+
+  @override
+  void dispose() {
+    final course = _activeCourse;
+    final lesson = _activeLesson;
+    if (course != null && lesson != null) {
+      _recordProgress(course, lesson);
+    }
+    super.dispose();
+  }
+
+  Future<void> _recordProgress(Course course, Lesson lesson) async {
+    final watchedMinutes = (lesson.durationMinutes * _progress).round();
+    final delta = watchedMinutes - _lastRecordedMinutes;
+    if (delta <= 0) {
+      return;
+    }
+    _lastRecordedMinutes = watchedMinutes;
+
+    try {
+      await _apiClient.postJson(
+        '/api/v1/progress',
+        token: HiveService.authToken,
+        body: {
+          'course': course.id,
+          'lesson': lesson.id,
+          'minutes': delta,
+          'isCompleted': _progress >= 0.99,
+        },
+      );
+    } catch (_) {
+      // Progress tracking should not interrupt playback.
+    }
   }
 
   @override
@@ -91,6 +132,8 @@ class _CoursePlayerPageState extends State<CoursePlayerPage> {
     
     final Course course = courseArg;
     final Lesson currentLesson = lessonArg;
+    _activeCourse = course;
+    _activeLesson = currentLesson;
 
 
     return Scaffold(
@@ -274,6 +317,9 @@ class _CoursePlayerPageState extends State<CoursePlayerPage> {
                       onTap: () {
                         setState(() {
                           _isPlaying = !_isPlaying;
+                          if (!_isPlaying) {
+                            _recordProgress(course, currentLesson);
+                          }
                         });
                       },
                     );
@@ -319,7 +365,18 @@ class _CoursePlayerPageState extends State<CoursePlayerPage> {
                   child: PrimaryButton(
                     text: 'Buy Now',
                     onPressed: () {
-                      // Handle buy now
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.paymentMethod,
+                        arguments: {
+                          'returnRoute': AppRoutes.coursePlayer,
+                          'returnArgs': {
+                            'course': course,
+                            'lesson': currentLesson,
+                          },
+                          'courseId': course.id,
+                          'amount': course.price,
+                        },
+                      );
                     },
                   ),
                 ),
