@@ -25,6 +25,7 @@ class FilePickerScreen extends StatelessWidget {
   final bool allowPdf;
   final bool allowAny;
   final bool allowCamera;
+  static const CameraDevice _defaultCameraDevice = CameraDevice.front;
 
   const FilePickerScreen({
     Key? key,
@@ -119,7 +120,7 @@ class FilePickerScreen extends StatelessWidget {
     final picker = ImagePicker();
     final image = await picker.pickImage(
       source: ImageSource.camera,
-      preferredCameraDevice: CameraDevice.front,
+      preferredCameraDevice: _defaultCameraDevice,
     );
     if (image == null) {
       return;
