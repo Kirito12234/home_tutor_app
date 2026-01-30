@@ -20,8 +20,11 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   final TextEditingController _searchController = TextEditingController();
   List<Course> _courses = [];
   int _currentNavIndex = 2;
+  List<String> _selectedCategories = [];
+  String? _selectedDuration;
+  RangeValues _priceRange = const RangeValues(0, 100000);
   final List<String> _filterChips = [
-    'Visual identiy',
+    'Visual identity',
     'Painting',
     'Coding',
     'Writing',
@@ -50,13 +53,18 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   @override
   void initState() {
     super.initState();
-    _searchController.text = widget.query ?? 'Product Design';
+    _searchController.text = widget.query ?? '';
     _loadCourses();
   }
 
   void _loadCourses() {
     setState(() {
-      _courses = DummyCourses.getCourses()
+      _courses = DummyCourses.filterCourses(
+        categories: _selectedCategories.isEmpty ? null : _selectedCategories,
+        durationRange: _selectedDuration,
+        minPrice: _priceRange.start,
+        maxPrice: _priceRange.end,
+      )
           .where((c) => c.title.toLowerCase().contains(
                 _searchController.text.toLowerCase(),
               ))
@@ -70,23 +78,16 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => FilterSheet(
-        selectedCategories: [],
+        selectedCategories: _selectedCategories,
+        selectedDuration: _selectedDuration,
+        priceRange: _priceRange,
         onApply: (categories, duration, priceRange) {
-          // Apply filters - filter courses based on selections
           setState(() {
-            var filtered = DummyCourses.filterCourses(
-              categories: categories.isEmpty ? null : categories,
-              durationRange: duration,
-              minPrice: priceRange?.start,
-              maxPrice: priceRange?.end,
-            );
-            _courses = filtered.where((c) => 
-              _searchController.text.isEmpty || 
-              c.title.toLowerCase().contains(
-                _searchController.text.toLowerCase(),
-              )
-            ).toList();
+            _selectedCategories = categories;
+            _selectedDuration = duration;
+            _priceRange = priceRange ?? const RangeValues(0, 100000);
           });
+          _loadCourses();
         },
       ),
     );
@@ -176,19 +177,36 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 24),
               children: _filterChips.map((chip) {
+                final isSelected = _selectedCategories.contains(chip);
                 return Container(
                   margin: const EdgeInsets.only(right: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundLight,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    chip,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                      fontFamily: 'Inter',
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedCategories.remove(chip);
+                        } else {
+                          _selectedCategories.add(chip);
+                        }
+                      });
+                      _loadCourses();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : AppColors.backgroundLight,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        chip,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isSelected
+                              ? AppColors.buttonText
+                              : AppColors.textSecondary,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
                     ),
                   ),
                 );

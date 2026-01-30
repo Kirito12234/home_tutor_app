@@ -63,22 +63,46 @@ class LearnBannerCard extends StatelessWidget {
       );
     } else {
       return Expanded(
-        child: Container(
-          margin: const EdgeInsets.only(left: 8),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.categoryBeige,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.book,
-                size: 50,
-                color: AppColors.durationOrange,
-              ),
-            ],
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.categoryBeige,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Icon(
+                  Icons.workspace_premium,
+                  size: 42,
+                  color: AppColors.durationOrange,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Learn today',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: PrimaryButton(
+                    text: 'Learn today',
+                    onPressed: onTap,
+                    height: 40,
+                    borderRadius: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );

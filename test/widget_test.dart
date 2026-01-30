@@ -8,15 +8,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:home_tutor_app/main.dart';
 import 'package:home_tutor_app/app/app.dart';
+import 'utils/hive_test_utils.dart';
 
 void main() {
-  testWidgets('App loads successfully', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const App());
+  setUpAll(() async {
+    await HiveTestUtils.ensureInitialized();
+  });
 
-    // Verify that the app loads
+  tearDownAll(() async {
+    await HiveTestUtils.dispose();
+  });
+
+  setUp(() async {
+    await HiveTestUtils.clearBox();
+  });
+
+  testWidgets('App loads successfully', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(const App());
+    await tester.pumpAndSettle();
+
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

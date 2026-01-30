@@ -1,12 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/services/api/api_client.dart';
+import '../../../../core/services/api/api_config.dart';
+import '../../../../core/services/hive/hive_service.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../domain/entities/course.dart';
 import '../widgets/lesson_list_item.dart';
+import '../../../dashboard/domain/entities/lesson.dart';
 
-class CourseDetailPage extends StatelessWidget {
+class CourseDetailPage extends StatefulWidget {
   const CourseDetailPage({Key? key}) : super(key: key);
+
+  @override
+  State<CourseDetailPage> createState() => _CourseDetailPageState();
+}
+
+class _CourseDetailPageState extends State<CourseDetailPage> {
+  final ApiClient _apiClient = ApiClient();
+  Course? _course;
+  List<Lesson> _lessons = [];
+  bool _isLoading = false;
+  bool _isRequesting = false;
+  String? _errorMessage;
+  bool _didLoad = false;
 
   String _formatPrice(double price) {
     return 'RS ${price.toStringAsFixed(0).replaceAllMapped(
@@ -15,11 +33,224 @@ class CourseDetailPage extends StatelessWidget {
     )}';
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didLoad) {
+      return;
+    }
+    _didLoad = true;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args == null || args is! Course) {
+      setState(() {
+        _course = null;
+      });
+      return;
+    }
+    setState(() {
+      _course = args;
+    });
+    _loadLessons(args.id);
+  }
+
+  Future<void> _loadLessons(String courseId) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiClient.getJson('/api/v1/courses/$courseId/lessons');
+      final data = response['data'];
+      if (data is List) {
+        final mapped = data
+            .whereType<Map<String, dynamic>>()
+            .map((lesson) {
+              return Lesson(
+                id: lesson['_id']?.toString() ?? lesson['id']?.toString() ?? 'lesson',
+                title: lesson['title']?.toString() ?? 'Lesson',
+                durationMinutes: (lesson['durationMinutes'] as num?)?.toInt() ?? 0,
+                isLocked: lesson['isLocked'] == true,
+                order: (lesson['order'] as num?)?.toInt() ?? 0,
+                imageUrl: lesson['imageUrl']?.toString(),
+                pdfUrl: lesson['pdfUrl']?.toString(),
+              );
+            })
+            .toList();
+        setState(() {
+          _lessons = mapped;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Unexpected response format.';
+        });
+      }
+    } on HttpException catch (err) {
+      setState(() {
+        _errorMessage = err.message;
+      });
+    } catch (_) {
+      setState(() {
+        _errorMessage = 'Unable to load lessons.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _sendTeacherRequest(Course course) async {
+    final token = HiveService.authToken;
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to send request.')),
+      );
+      Navigator.of(context).pushNamed(AppRoutes.login);
+      return;
+    }
+    if (course.tutorId == null || course.tutorId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Teacher information is missing.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isRequesting = true;
+    });
+
+    try {
+      await _apiClient.postJson(
+        '/api/v1/teacher-requests',
+        token: token,
+        body: {
+          'course': course.id,
+          'tutor': course.tutorId,
+          'message': 'Request to join course.',
+        },
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request sent to teacher.')),
+      );
+    } on HttpException catch (err) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to send request.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequesting = false;
+        });
+      }
+    }
+  }
+
+  String _assetUrl(String? path) {
+    if (path == null || path.isEmpty) {
+      return '';
+    }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    final base = socketBaseUrl();
+    if (path.startsWith('/')) {
+      return '$base$path';
+    }
+    return '$base/$path';
+  }
+
+  Future<void> _openLessonMaterials(Lesson lesson) async {
+    final imageUrl = _assetUrl(lesson.imageUrl);
+    final pdfUrl = _assetUrl(lesson.pdfUrl);
+    if (imageUrl.isEmpty && pdfUrl.isEmpty) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                lesson.title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (imageUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imageUrl,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              if (pdfUrl.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.parse(pdfUrl);
+                    final launched = await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    );
+                    if (!launched && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Unable to open PDF.')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.picture_as_pdf),
+                  label: const Text('Open PDF'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.buttonText,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args == null || args is! Course) {
+    final course = _course;
+    if (course == null) {
       return Scaffold(
         body: Center(
           child: Column(
@@ -45,8 +276,6 @@ class CourseDetailPage extends StatelessWidget {
         ),
       );
     }
-    final Course course = args;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -267,20 +496,51 @@ class CourseDetailPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 32),
-                        ...course.lessons.map((lesson) {
-                          return LessonListItem(
-                            lesson: lesson,
-                            onTap: () {
-                              Navigator.of(context).pushNamed(
-                                AppRoutes.coursePlayer,
-                                arguments: {
-                                  'course': course,
-                                  'lesson': lesson,
-                                },
-                              );
-                            },
-                          );
-                        }),
+                        if (_isLoading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.redAccent,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          )
+                        else if (_lessons.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              'No lessons yet.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          )
+                        else
+                          ..._lessons.map((lesson) {
+                            return LessonListItem(
+                              lesson: lesson,
+                              onTap: () {
+                                Navigator.of(context).pushNamed(
+                                  AppRoutes.coursePlayer,
+                                  arguments: {
+                                    'course': course,
+                                    'lesson': lesson,
+                                  },
+                                );
+                              },
+                              onMaterialsTap: () => _openLessonMaterials(lesson),
+                            );
+                          }),
                         const SizedBox(height: 100), // Space for bottom bar
                       ],
                     ),
@@ -325,10 +585,41 @@ class CourseDetailPage extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: PrimaryButton(
-                    text: 'Buy Now',
-                    onPressed: () {
-                      Navigator.of(context).pushNamed(AppRoutes.paymentMethod);
-                    },
+                    text: HiveService.currentUserRole?.toLowerCase() == 'student'
+                        ? (_isRequesting ? 'Sending...' : 'Request Teacher')
+                        : 'Buy Now',
+                    onPressed: HiveService.currentUserRole?.toLowerCase() ==
+                            'student'
+                        ? (_isRequesting ? null : () => _sendTeacherRequest(course))
+                        : () {
+                            final token = HiveService.authToken;
+                            if (token == null || token.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please log in to purchase.'),
+                                ),
+                              );
+                              Navigator.of(context).pushNamed(AppRoutes.login);
+                              return;
+                            }
+                            if (course.id.isEmpty || course.price <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Course information is missing.'),
+                                ),
+                              );
+                              return;
+                            }
+                            Navigator.of(context).pushNamed(
+                              AppRoutes.paymentMethod,
+                              arguments: {
+                                'returnRoute': AppRoutes.courseDetail,
+                                'returnArgs': course,
+                                'courseId': course.id,
+                                'amount': course.price,
+                              },
+                            );
+                          },
                   ),
                 ),
               ],

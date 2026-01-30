@@ -1,11 +1,63 @@
 import 'package:flutter/material.dart';
-import '../../../../app/theme/app_colors.dart';
 
-class LearningPlanCard extends StatelessWidget {
+
+
+import '../../../../app/theme/app_colors.dart';
+import '../../../../app/routes/app_routes.dart';
+import '../../../../core/services/api/api_client.dart';
+import '../../../../core/services/hive/hive_service.dart';
+import '../../../../core/constants/learning_plan_courses.dart';
+
+class LearningPlanCard extends StatefulWidget {
   const LearningPlanCard({Key? key}) : super(key: key);
 
   @override
+  State<LearningPlanCard> createState() => _LearningPlanCardState();
+}
+
+class _LearningPlanCardState extends State<LearningPlanCard> {
+  final ApiClient _apiClient = ApiClient();
+  bool _isLoading = false;
+  String? _errorMessage;
+  List<LearningPlanCourse> _courses = buildLearningPlanCourses();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlans();
+  }
+
+  Future<void> _loadPlans() async {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isLoading = false;
+      _errorMessage = null;
+      _courses = buildLearningPlanCourses();
+    });
+  }
+
+  LearningPlanCourse _mapPlanToCourse(Map<String, dynamic> plan) {
+    final id = plan['_id']?.toString() ?? plan['id']?.toString() ?? 'plan';
+    final title = plan['title']?.toString() ?? 'Learning Plan';
+    final description = plan['description']?.toString() ?? '';
+    return LearningPlanCourse(
+      id: id,
+      title: title,
+      description: description,
+      level: 'Beginner',
+      mentor: 'Mentor',
+      completed: 0,
+      total: 1,
+      weeks: 1,
+      modules: const ['Session'],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final courses = _courses;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       padding: const EdgeInsets.all(20),
@@ -32,10 +84,63 @@ class LearningPlanCard extends StatelessWidget {
               fontFamily: 'Inter',
             ),
           ),
+          const SizedBox(height: 6),
+          const Text(
+            'All courses available in Nepal',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              fontFamily: 'Inter',
+            ),
+          ),
           const SizedBox(height: 20),
-          _buildPlanItem('Packaging Design', 40, 48),
-          const SizedBox(height: 20),
-          _buildPlanItem('Product Design', 6, 24),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _errorMessage!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.redAccent,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+          if (!_isLoading && _errorMessage == null && courses.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No learning plans yet.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: courses.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 20),
+            itemBuilder: (context, index) {
+              final course = courses[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).pushNamed(
+                    AppRoutes.learningPlanDetail,
+                    arguments: course,
+                  );
+                },
+                child: _buildPlanItem(course.title, course.completed, course.total),
+              );
+            },
+          ),
         ],
       ),
     );

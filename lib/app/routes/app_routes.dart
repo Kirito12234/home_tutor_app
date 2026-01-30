@@ -20,5 +20,36 @@ class AppRoutes {
   static const String noNetwork = '/no-network';
   static const String noVideos = '/no-videos';
   static const String noProducts = '/no-products';
+  static const String learnToday = '/learn-today';
+  static const String meetup = '/meetup';
+  static const String learningPlanDetail = '/learning-plan-detail';
+  static const String learningPlanVideo = '/learning-plan-video';
+  static const String learningPlanMessage = '/learning-plan-message';
+  static const String learningPlanSchedule = '/learning-plan-schedule';
+  static const String learningPlanLive = '/learning-plan-live';
+  static const String favourites = '/favourites';
+  static const String settingsPrivacy = '/settings-privacy';
+  static const String help = '/help';
+  static const String messageThread = '/message-thread';
+  static const String roleSelect = '/role-select';
+  static const String teacherHome = '/teacher-home';
+  static const String teacherCourses = '/teacher-courses';
+  static const String teacherSearch = '/teacher-search';
+  static const String teacherMessages = '/teacher-messages';
+  static const String teacherAccount = '/teacher-account';
+  static const String teacherProfessionals = '/teacher-professionals';
+  static const String teacherReports = '/teacher-reports';
+  static const String teacherCreateCourse = '/teacher-create-course';
+  static const String teacherScheduleSession = '/teacher-schedule-session';
+  static const String teacherRequests = '/teacher-requests';
+  static const String teacherManageStudents = '/teacher-manage-students';
+  static const String teacherShareInvite = '/teacher-share-invite';
+  static const String teacherPayoutSettings = '/teacher-payout-settings';
+  static const String teacherCourseOverview = '/teacher-course-overview';
+  static const String teacherStudentLogins = '/teacher-student-logins';
+  static const String teacherCourseDetail = '/teacher-course-detail';
+  static const String teacherManageCurriculum = '/teacher-manage-curriculum';
+  static const String teacherStudentProfile = '/teacher-student-profile';
+  static const String forgotPassword = '/forgot-password';
 }
 

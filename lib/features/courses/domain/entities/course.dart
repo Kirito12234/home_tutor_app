@@ -4,6 +4,7 @@ class Course {
   final String id;
   final String title;
   final String instructor;
+  final String? tutorId;
   final double price;
   final int durationHours;
   final int lessonCount;
@@ -19,6 +20,7 @@ class Course {
     required this.id,
     required this.title,
     required this.instructor,
+    this.tutorId,
     required this.price,
     required this.durationHours,
     required this.lessonCount,
