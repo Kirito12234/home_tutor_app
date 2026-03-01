@@ -1,4 +1,4 @@
-enum SensorEventType { accelerometer, gyroscope }
+enum SensorEventType { accelerometer, userAccelerometer, gyroscope }
 
 class SensorSample {
   const SensorSample({

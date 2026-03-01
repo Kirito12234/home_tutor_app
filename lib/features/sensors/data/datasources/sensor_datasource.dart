@@ -5,5 +5,9 @@ class SensorDataSource {
   Stream<AccelerometerEvent> accelerometerStream() => accelerometerEvents;
 
   // ignore: deprecated_member_use
+  Stream<UserAccelerometerEvent> userAccelerometerStream() =>
+      userAccelerometerEvents;
+
+  // ignore: deprecated_member_use
   Stream<GyroscopeEvent> gyroscopeStream() => gyroscopeEvents;
 }

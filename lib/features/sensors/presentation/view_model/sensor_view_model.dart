@@ -19,11 +19,17 @@ class SensorViewModel extends StateNotifier<SensorState> {
   Timer? _noDataTimer;
   bool _isCooldown = false;
   double? _previousGyroZ;
-  double? _previousAccelMagnitude;
+  double? _previousImpactMagnitude;
+  bool _hasUserAccelerometer = false;
   bool _receivedAnySample = false;
 
   static const String _noDataMessage =
       'Sensors inactive. Emulator: Extended controls -> Virtual sensors.';
+
+  static const double _impactMagnitudeThreshold = 9.0;
+  static const double _impactDeltaThreshold = 7.0;
+  static const double _gyroFastThreshold = 2.8;
+  static const double _gyroZFlipDeltaThreshold = 3.5;
 
   void _subscribe() {
     try {
@@ -69,35 +75,59 @@ class SensorViewModel extends StateNotifier<SensorState> {
       return;
     }
 
-    if (sample.type == SensorEventType.accelerometer) {
+    if (sample.type == SensorEventType.userAccelerometer) {
+      _hasUserAccelerometer = true;
+    }
+
+    if (sample.type == SensorEventType.userAccelerometer ||
+        (!_hasUserAccelerometer &&
+            sample.type == SensorEventType.accelerometer)) {
       final force = sqrt(
         (sample.x * sample.x) + (sample.y * sample.y) + (sample.z * sample.z),
       );
-      final delta = _previousAccelMagnitude == null
+      final delta = _previousImpactMagnitude == null
           ? 0
-          : (force - _previousAccelMagnitude!).abs();
-      _previousAccelMagnitude = force;
+          : (force - _previousImpactMagnitude!).abs();
+      _previousImpactMagnitude = force;
 
-      // Resting magnitude is ~9.8. Keep thresholds low enough so users can
-      // observe this working on real devices and emulators.
-      if (force > 14 || delta > 6) {
+      // Prefer `userAccelerometer` (no gravity). If we only get plain
+      // accelerometer (includes gravity), raise thresholds to avoid false
+      // positives while still catching obvious impacts.
+      final isGravityIncluded = sample.type == SensorEventType.accelerometer;
+      final magnitudeThreshold =
+          isGravityIncluded ? 15.0 : _impactMagnitudeThreshold;
+      final deltaThreshold = isGravityIncluded ? 7.5 : _impactDeltaThreshold;
+
+      if (force > magnitudeThreshold || delta > deltaThreshold) {
         state = state.copyWith(
-          warningMessage: '⚠️ Impact detected! Device hit something.',
+          warningMessage:
+              '⚠️ Impact detected (a=${force.toStringAsFixed(1)}).',
         );
         startCooldown();
       }
       return;
     }
 
-    final isFastRotation =
-        sample.x.abs() > 2 || sample.y.abs() > 2 || sample.z.abs() > 2;
+    if (sample.type != SensorEventType.gyroscope) {
+      return;
+    }
+
+    final gyroMagnitude = sqrt(
+      (sample.x * sample.x) + (sample.y * sample.y) + (sample.z * sample.z),
+    );
+    final isFastRotation = gyroMagnitude > (_gyroFastThreshold * 1.25) ||
+        sample.x.abs() > _gyroFastThreshold ||
+        sample.y.abs() > _gyroFastThreshold ||
+        sample.z.abs() > _gyroFastThreshold;
     final hasRapidZFlip =
-        _previousGyroZ != null && (sample.z - _previousGyroZ!).abs() > 3;
+        _previousGyroZ != null &&
+        (sample.z - _previousGyroZ!).abs() > _gyroZFlipDeltaThreshold;
     _previousGyroZ = sample.z;
 
     if (isFastRotation || hasRapidZFlip) {
       state = state.copyWith(
-        warningMessage: '⚠️ Sudden rotation detected!',
+        warningMessage:
+            '⚠️ Sudden rotation detected (g=${gyroMagnitude.toStringAsFixed(1)}).',
       );
       startCooldown();
     }
