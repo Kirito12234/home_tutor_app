@@ -332,53 +332,128 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
     return '$base/$raw';
   }
 
-  Future<void> _viewRequestScreenshot(_TeacherRequestItem request) async {
-    final raw = request.proofImageUrl;
-    if (raw.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No screenshot uploaded by student yet.')),
-      );
-      return;
+  Map<String, String>? _authHeaders() {
+    final token = HiveService.authToken;
+    if (token == null || token.trim().isEmpty) {
+      return null;
     }
-    final imageUrl = _assetUrl(raw);
+    return <String, String>{'Authorization': 'Bearer ${token.trim()}'};
+  }
+
+  Future<void> _viewRequest(_TeacherRequestItem request) async {
+    final imageUrl =
+        request.proofImageUrl.isEmpty ? '' : _assetUrl(request.proofImageUrl);
+    final uri = imageUrl.isEmpty ? null : Uri.tryParse(imageUrl);
+
     if (!mounted) {
       return;
     }
+
     await showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
-        child: InteractiveViewer(
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Unable to preview image.'),
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: () async {
-                        final uri = Uri.tryParse(imageUrl);
-                        if (uri == null) {
-                          return;
-                        }
-                        await launchUrl(
-                          uri,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      },
-                      child: const Text('Open externally'),
+      builder: (context) {
+        return AlertDialog(
+          title: Text('${request.studentName} • ${request.courseTitle}'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Status: ${request.statusLabel}'),
+                  const SizedBox(height: 6),
+                  Text('Requested: ${request.createdLabel}'),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Payment proof',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  if (uri == null)
+                    const Text('No screenshot uploaded by student yet.')
+                  else
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        height: 320,
+                        width: double.infinity,
+                        child: InteractiveViewer(
+                          child: Image.network(
+                            uri.toString(),
+                            fit: BoxFit.contain,
+                            headers: _authHeaders(),
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) {
+                                return child;
+                              }
+                              final expected = progress.expectedTotalBytes;
+                              final loaded = progress.cumulativeBytesLoaded;
+                              final value = expected == null
+                                  ? null
+                                  : loaded / expected;
+                              return Center(
+                                child: CircularProgressIndicator(value: value),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text('Unable to preview image.'),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-              );
-            },
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+          actions: [
+            if (uri != null)
+              TextButton(
+                onPressed: () async {
+                  await launchUrl(
+                    uri,
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+                child: const Text('Open externally'),
+              ),
+            if (request.isPending)
+              TextButton(
+                onPressed: _mutatingRequestIds.contains(request.id)
+                    ? null
+                    : () async {
+                        Navigator.of(context).pop();
+                        await _updateStatus(request, 'rejected');
+                      },
+                child: const Text('Decline'),
+              ),
+            if (request.isPending)
+              ElevatedButton(
+                onPressed: _mutatingRequestIds.contains(request.id)
+                    ? null
+                    : () async {
+                        Navigator.of(context).pop();
+                        await _updateStatus(request, 'accepted');
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.teacherPrimary,
+                  foregroundColor: AppColors.buttonText,
+                ),
+                child: const Text('Accept'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -530,9 +605,7 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton(
-                        onPressed: request.proofImageUrl.isEmpty
-                            ? null
-                            : () => _viewRequestScreenshot(request),
+                        onPressed: () => _viewRequest(request),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: const BorderSide(color: AppColors.divider),
