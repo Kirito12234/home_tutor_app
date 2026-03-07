@@ -12,6 +12,7 @@ import '../../../../core/services/socket/socket_service.dart';
 import '../../../../core/services/teacher/teacher_request_actions_service.dart';
 import '../../../notifications/domain/entities/message_notification.dart';
 import '../../../teacher_dashboard/presentation/widgets/teacher_bottom_nav.dart';
+import '../view_model/teacher_messages_models.dart';
 
 class TeacherMessagesPage extends StatefulWidget {
   const TeacherMessagesPage({super.key});
@@ -36,9 +37,9 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
   bool _isSearchingOrCreating = false;
   String? _errorMessage;
 
-  final List<_ThreadItem> _threads = <_ThreadItem>[];
-  final List<_TeacherRequestItem> _requests = <_TeacherRequestItem>[];
-  final List<_StudentItem> _students = <_StudentItem>[];
+  final List<TeacherThreadItem> _threads = <TeacherThreadItem>[];
+  final List<TeacherRequestItem> _requests = <TeacherRequestItem>[];
+  final List<TeacherStudentItem> _students = <TeacherStudentItem>[];
   final List<NotificationItem> _notifications = <NotificationItem>[];
 
   String _searchQuery = '';
@@ -166,7 +167,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
       if (data is List) {
         final mapped = data
             .whereType<Map<String, dynamic>>()
-            .map(_TeacherRequestItem.fromJson)
+            .map(TeacherRequestItem.fromJson)
             .where(
               (item) => item.status.toLowerCase() == 'pending' && !item.isDeleted,
             )
@@ -206,7 +207,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
       if (data is List) {
         final mapped = data
             .whereType<Map<String, dynamic>>()
-            .map(_StudentItem.fromTutorStudentJson)
+            .map(TeacherStudentItem.fromTutorStudentJson)
             .where((student) => student.id.isNotEmpty)
             .toList();
         if (!mounted) {
@@ -230,7 +231,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
       if (data is! List) {
         return;
       }
-      final results = <String, _StudentItem>{};
+      final results = <String, TeacherStudentItem>{};
       for (final row in data.whereType<Map<String, dynamic>>()) {
         final student = row['student'];
         if (student is! Map<String, dynamic>) {
@@ -241,7 +242,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
         if (id.isEmpty || name.isEmpty) {
           continue;
         }
-        results[id] = _StudentItem(id: id, name: name);
+        results[id] = TeacherStudentItem(id: id, name: name);
       }
       if (!mounted) {
         return;
@@ -298,6 +299,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadThreads();
+      _loadRequests();
       _loadNotifications();
     });
   }
@@ -378,6 +380,10 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
       _notifications.insert(0, mapped);
     });
 
+    if (mapped.type.trim().toLowerCase() == 'request') {
+      _loadRequests();
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(mapped.title),
@@ -407,7 +413,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
       return;
     }
 
-    var student = _students.cast<_StudentItem?>().firstWhere(
+    var student = _students.cast<TeacherStudentItem?>().firstWhere(
           (item) => item != null && item.name.toLowerCase().contains(_searchQuery),
           orElse: () => null,
         );
@@ -424,7 +430,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
     await _createOrOpenThreadForStudent(student);
   }
 
-  Future<_StudentItem?> _searchStudentFromServer(String query) async {
+  Future<TeacherStudentItem?> _searchStudentFromServer(String query) async {
     final token = HiveService.authToken;
     if (token == null || token.isEmpty || query.trim().isEmpty) {
       return null;
@@ -454,7 +460,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
             continue;
           }
           if (name.toLowerCase().contains(query.toLowerCase())) {
-            return _StudentItem(id: id, name: name);
+            return TeacherStudentItem(id: id, name: name);
           }
         }
       } on HttpException catch (err) {
@@ -469,7 +475,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
     return null;
   }
 
-  Future<void> _createOrOpenThreadForStudent(_StudentItem student) async {
+  Future<void> _createOrOpenThreadForStudent(TeacherStudentItem student) async {
     final existing = _threads.where((thread) {
       final sameId = thread.participantId != null && thread.participantId == student.id;
       final sameName = thread.name.toLowerCase() == student.name.toLowerCase();
@@ -549,7 +555,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
     }
   }
 
-  void _openThread(_ThreadItem thread) {
+  void _openThread(TeacherThreadItem thread) {
     Navigator.of(context).pushNamed(
       AppRoutes.messageThread,
       arguments: MessageNotification(
@@ -562,7 +568,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
     );
   }
 
-  Future<void> _updateRequestStatus(_TeacherRequestItem request, String status) async {
+  Future<void> _updateRequestStatus(TeacherRequestItem request, String status) async {
     final token = HiveService.authToken;
     if (token == null || token.isEmpty) {
       return;
@@ -605,11 +611,11 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
     }
   }
 
-  _ThreadItem _mapThread(Map<String, dynamic> thread) {
+  TeacherThreadItem _mapThread(Map<String, dynamic> thread) {
     final otherName = thread['otherParticipantName']?.toString();
     final otherId = thread['otherParticipantId']?.toString();
     if (otherName != null && otherName.trim().isNotEmpty) {
-      return _ThreadItem(
+      return TeacherThreadItem(
         id: thread['_id']?.toString() ?? thread['id']?.toString() ?? '',
         participantId: otherId,
         name: otherName,
@@ -658,7 +664,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
       }
     }
 
-    return _ThreadItem(
+    return TeacherThreadItem(
       id: thread['_id']?.toString() ?? thread['id']?.toString() ?? '',
       participantId: participantId,
       name: name,
@@ -747,7 +753,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
     return null;
   }
 
-  List<_ThreadItem> get _filteredThreads {
+  List<TeacherThreadItem> get _filteredThreads {
     if (_searchQuery.trim().isEmpty) {
       return _threads;
     }
@@ -756,7 +762,7 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
         .toList();
   }
 
-  List<_TeacherRequestItem> get _filteredRequests {
+  List<TeacherRequestItem> get _filteredRequests {
     if (_searchQuery.trim().isEmpty) {
       return _requests;
     }
@@ -765,9 +771,9 @@ class _TeacherMessagesPageState extends State<TeacherMessagesPage> {
         .toList();
   }
 
-  List<_StudentItem> get _searchMatchedStudents {
+  List<TeacherStudentItem> get _searchMatchedStudents {
     if (_searchQuery.trim().isEmpty) {
-      return <_StudentItem>[];
+      return <TeacherStudentItem>[];
     }
     return _students
         .where((student) => student.name.toLowerCase().contains(_searchQuery))
@@ -1181,7 +1187,7 @@ class _SubTabChip extends StatelessWidget {
 class _ThreadTile extends StatelessWidget {
   const _ThreadTile({required this.thread, required this.onTap});
 
-  final _ThreadItem thread;
+  final TeacherThreadItem thread;
   final VoidCallback onTap;
 
   @override
@@ -1268,7 +1274,7 @@ class _RequestTile extends StatelessWidget {
     required this.onDecline,
   });
 
-  final _TeacherRequestItem request;
+  final TeacherRequestItem request;
   final VoidCallback onApprove;
   final VoidCallback onDecline;
 
@@ -1337,7 +1343,7 @@ class _RequestTile extends StatelessWidget {
 class _StudentSearchTile extends StatelessWidget {
   const _StudentSearchTile({required this.student, required this.onStartChat});
 
-  final _StudentItem student;
+  final TeacherStudentItem student;
   final VoidCallback onStartChat;
 
   @override
@@ -1369,97 +1375,6 @@ class _StudentSearchTile extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ThreadItem {
-  const _ThreadItem({
-    required this.id,
-    required this.participantId,
-    required this.name,
-    required this.lastMessage,
-    required this.time,
-    required this.isOnline,
-  });
-
-  final String id;
-  final String? participantId;
-  final String name;
-  final String lastMessage;
-  final String time;
-  final bool isOnline;
-
-  _ThreadItem copyWith({
-    String? id,
-    String? participantId,
-    String? name,
-    String? lastMessage,
-    String? time,
-    bool? isOnline,
-  }) {
-    return _ThreadItem(
-      id: id ?? this.id,
-      participantId: participantId ?? this.participantId,
-      name: name ?? this.name,
-      lastMessage: lastMessage ?? this.lastMessage,
-      time: time ?? this.time,
-      isOnline: isOnline ?? this.isOnline,
-    );
-  }
-}
-
-class _StudentItem {
-  const _StudentItem({
-    required this.id,
-    required this.name,
-  });
-
-  final String id;
-  final String name;
-
-  static _StudentItem fromTutorStudentJson(Map<String, dynamic> json) {
-    final student = json['student'];
-    final studentMap = student is Map<String, dynamic> ? student : <String, dynamic>{};
-    return _StudentItem(
-      id: studentMap['_id']?.toString() ?? studentMap['id']?.toString() ?? '',
-      name: studentMap['name']?.toString() ?? 'Student',
-    );
-  }
-}
-
-class _TeacherRequestItem {
-  const _TeacherRequestItem({
-    required this.id,
-    required this.studentId,
-    required this.studentName,
-    required this.courseTitle,
-    required this.status,
-    required this.isDeleted,
-  });
-
-  final String id;
-  final String studentId;
-  final String studentName;
-  final String courseTitle;
-  final String status;
-  final bool isDeleted;
-
-  static _TeacherRequestItem fromJson(Map<String, dynamic> json) {
-    final student = json['student'];
-    final studentMap = student is Map<String, dynamic> ? student : <String, dynamic>{};
-    final course = json['course'];
-    final courseMap = course is Map<String, dynamic> ? course : <String, dynamic>{};
-
-    return _TeacherRequestItem(
-      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
-      studentId: studentMap['_id']?.toString() ?? studentMap['id']?.toString() ?? '',
-      studentName: studentMap['name']?.toString() ?? 'Student',
-      courseTitle: courseMap['title']?.toString() ?? 'Course',
-      status: json['status']?.toString() ?? 'pending',
-      isDeleted: json['isDeleted'] == true ||
-          json['deleted'] == true ||
-          (json['status']?.toString().toLowerCase() == 'deleted'),
     );
   }
 }

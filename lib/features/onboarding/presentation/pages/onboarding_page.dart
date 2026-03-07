@@ -147,55 +147,58 @@ class _OnboardingPageState extends State<OnboardingPage> {
   Widget _buildPage(OnboardingData data) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final imageHeight = (constraints.maxHeight * 0.45).clamp(200.0, 300.0);
-        final topSpacing = (constraints.maxHeight * 0.05).clamp(16.0, 40.0);
-        final betweenSpacing = (constraints.maxHeight * 0.05).clamp(24.0, 48.0);
+        final imageHeight = (constraints.maxHeight * 0.45).clamp(140.0, 300.0);
+        final betweenSpacing = (constraints.maxHeight * 0.05).clamp(16.0, 48.0);
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: topSpacing),
-              Container(
-                width: double.infinity,
-                height: imageHeight,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F0FE),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.school,
-                    size: 120,
-                    color: AppColors.primary.withOpacity(0.6),
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: imageHeight,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F0FE),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.school,
+                        size: 120,
+                        color: AppColors.primary.withOpacity(0.6),
+                      ),
+                    ),
                   ),
-                ),
+                  SizedBox(height: betweenSpacing),
+                  Text(
+                    data.title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'OpenSans',
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    data.subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                      fontFamily: 'OpenSans',
+                      height: 1.5,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: betweenSpacing),
-              Text(
-                data.title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'OpenSans',
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                data.subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'OpenSans',
-                  height: 1.5,
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
