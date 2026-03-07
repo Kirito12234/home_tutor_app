@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/routes/app_routes.dart';
@@ -5,6 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
 import '../../../../core/services/hive/hive_service.dart';
+import '../../../../core/services/socket/socket_service.dart';
 import '../../../../core/services/teacher/teacher_request_actions_service.dart';
 
 class TeacherRequestsPage extends StatefulWidget {
@@ -18,6 +21,10 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
   final ApiClient _apiClient = ApiClient();
   final TeacherRequestActionsService _requestActions =
       TeacherRequestActionsService();
+  final SocketService _socketService = SocketService();
+  Timer? _pollTimer;
+  bool _isFetching = false;
+  final Set<String> _mutatingRequestIds = <String>{};
   bool _isLoading = false;
   String? _errorMessage;
   List<_TeacherRequestItem> _requests = [];
@@ -25,22 +32,97 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
   @override
   void initState() {
     super.initState();
-    _loadRequests();
+    _loadRequests(showLoading: true);
+    _startPolling();
+    _initSocket();
   }
 
-  Future<void> _loadRequests() async {
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _loadRequests(showLoading: false);
+    });
+  }
+
+  void _initSocket() {
+    _socketService.connect();
+    _socketService.joinUser();
+    _socketService.onNotificationNew(_handleNotificationNew);
+  }
+
+  void _handleNotificationNew(dynamic payload) {
+    if (!mounted) {
+      return;
+    }
+    // Keep it simple: if teacher receives any notification while on this page,
+    // refresh requests in the background so repeated requests show up quickly.
+    _loadRequests(showLoading: false);
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _socketService.offNotificationNew(_handleNotificationNew);
+    super.dispose();
+  }
+
+  List<_TeacherRequestItem> _dedupeRequests(List<_TeacherRequestItem> items) {
+    // 1) Dedupe by request id (defensive).
+    final byId = <String, _TeacherRequestItem>{};
+    for (final item in items) {
+      final key = item.id;
+      if (key.isEmpty) {
+        continue;
+      }
+      final existing = byId[key];
+      if (existing == null || item.createdAt.isAfter(existing.createdAt)) {
+        byId[key] = item;
+      }
+    }
+
+    // 2) Dedupe by student+course so resubmits don't hide a new pending request.
+    final byStudentCourse = <String, _TeacherRequestItem>{};
+    for (final item in byId.values) {
+      final key = item.groupKey;
+      final existing = byStudentCourse[key];
+      if (existing == null) {
+        byStudentCourse[key] = item;
+        continue;
+      }
+      if (existing.isPending != item.isPending) {
+        byStudentCourse[key] = item.isPending ? item : existing;
+        continue;
+      }
+      if (item.createdAt.isAfter(existing.createdAt)) {
+        byStudentCourse[key] = item;
+      }
+    }
+
+    final list = byStudentCourse.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  Future<void> _loadRequests({required bool showLoading}) async {
+    if (_isFetching) {
+      return;
+    }
+    _isFetching = true;
     final token = HiveService.authToken;
     if (token == null || token.isEmpty) {
       setState(() {
         _errorMessage = 'Please log in to view requests.';
       });
+      _isFetching = false;
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (showLoading && mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final response = await _apiClient.getJson(
@@ -49,32 +131,44 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
       );
       final data = response['data'];
       if (data is List) {
-        final mapped = data
+        final mapped = _dedupeRequests(
+          data
             .whereType<Map<String, dynamic>>()
             .map(_TeacherRequestItem.fromJson)
             .where((item) => !item.isDeleted)
             .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        setState(() {
-          _requests = mapped;
-        });
+        );
+        if (mounted) {
+          setState(() {
+            _requests = mapped;
+          });
+        }
       } else {
-        setState(() {
-          _errorMessage = 'Unexpected response format.';
-        });
+        if (mounted && showLoading) {
+          setState(() {
+            _errorMessage = 'Unexpected response format.';
+          });
+        }
       }
     } on HttpException catch (err) {
-      setState(() {
-        _errorMessage = err.message;
-      });
+      if (mounted && showLoading) {
+        setState(() {
+          _errorMessage = err.message;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _errorMessage = 'Unable to load requests.';
-      });
+      if (mounted && showLoading) {
+        setState(() {
+          _errorMessage = 'Unable to load requests.';
+        });
+      }
     } finally {
+      _isFetching = false;
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          if (showLoading) {
+            _isLoading = false;
+          }
         });
       }
     }
@@ -85,6 +179,16 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
     if (token == null || token.isEmpty) {
       return;
     }
+    if (_mutatingRequestIds.contains(request.id)) {
+      return;
+    }
+    setState(() {
+      _mutatingRequestIds.add(request.id);
+      _requests = _requests
+          .map((item) =>
+              item.id == request.id ? item.copyWith(status: status) : item)
+          .toList();
+    });
     try {
       await _requestActions.updateStatus(
         requestId: request.id,
@@ -94,26 +198,29 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _requests = _requests
-            .map((item) =>
-                item.id == request.id ? item.copyWith(status: status) : item)
-            .toList();
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Request $status.')),
       );
+      await _loadRequests(showLoading: false);
     } on HttpException catch (err) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(err.message)),
         );
       }
+      await _loadRequests(showLoading: false);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to update request.')),
         );
+      }
+      await _loadRequests(showLoading: false);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _mutatingRequestIds.remove(request.id);
+        });
       }
     }
   }
@@ -123,6 +230,12 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
     if (token == null || token.isEmpty) {
       return;
     }
+    if (_mutatingRequestIds.contains(request.id)) {
+      return;
+    }
+    setState(() {
+      _mutatingRequestIds.add(request.id);
+    });
     try {
       await _requestActions.deleteRequest(
         requestId: request.id,
@@ -145,6 +258,12 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to delete request.')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _mutatingRequestIds.remove(request.id);
+        });
       }
     }
   }
@@ -295,47 +414,50 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
             ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-        children: [
-          const Text(
-            'New requests',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-              fontFamily: 'OpenSans',
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                _errorMessage!,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.redAccent,
-                  fontFamily: 'OpenSans',
-                ),
-              ),
-            ),
-          if (!_isLoading && _errorMessage == null && _requests.isEmpty)
+      body: RefreshIndicator(
+        onRefresh: () => _loadRequests(showLoading: false),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          children: [
             const Text(
-              'No requests yet.',
+              'New requests',
               style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
                 fontFamily: 'OpenSans',
               ),
             ),
-          ..._requests.map(
-            (request) => Container(
+            const SizedBox(height: 12),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.redAccent,
+                    fontFamily: 'OpenSans',
+                  ),
+                ),
+              ),
+            if (!_isLoading && _errorMessage == null && _requests.isEmpty)
+              const Text(
+                'No requests yet.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontFamily: 'OpenSans',
+                ),
+              ),
+            ..._requests.map(
+              (request) => Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -371,13 +493,14 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: request.isPending
-                              ? () => _updateStatus(request, 'rejected')
-                              : null,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: request.isPending &&
+                                    !_mutatingRequestIds.contains(request.id)
+                                ? () => _updateStatus(request, 'rejected')
+                                : null,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.textPrimary,
                             side: const BorderSide(color: AppColors.divider),
@@ -389,11 +512,12 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: request.isPending
-                              ? () => _updateStatus(request, 'accepted')
-                              : null,
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: request.isPending &&
+                                    !_mutatingRequestIds.contains(request.id)
+                                ? () => _updateStatus(request, 'accepted')
+                                : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.teacherPrimary,
                             foregroundColor: AppColors.buttonText,
@@ -420,7 +544,9 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        onPressed: () => _deleteRequest(request),
+                        onPressed: _mutatingRequestIds.contains(request.id)
+                            ? null
+                            : () => _deleteRequest(request),
                         icon: const Icon(Icons.delete_outline),
                         color: AppColors.teacherMuted,
                       ),
@@ -439,9 +565,10 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
                   ],
                 ],
               ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -449,6 +576,8 @@ class _TeacherRequestsPageState extends State<TeacherRequestsPage> {
 
 class _TeacherRequestItem {
   final String id;
+  final String studentId;
+  final String courseId;
   final String studentName;
   final String courseTitle;
   final String status;
@@ -458,6 +587,8 @@ class _TeacherRequestItem {
 
   const _TeacherRequestItem({
     required this.id,
+    required this.studentId,
+    required this.courseId,
     required this.studentName,
     required this.courseTitle,
     required this.status,
@@ -466,10 +597,21 @@ class _TeacherRequestItem {
     required this.proofImageUrl,
   });
 
-  bool get isPending => status == 'pending';
+  String get normalizedStatus => status.trim().toLowerCase();
+
+  bool get isPending => normalizedStatus == 'pending';
+
+  String get groupKey {
+    final sid = studentId.trim();
+    final cid = courseId.trim();
+    if (sid.isNotEmpty || cid.isNotEmpty) {
+      return '$sid::$cid';
+    }
+    return '${studentName.trim().toLowerCase()}::${courseTitle.trim().toLowerCase()}';
+  }
 
   String get statusLabel {
-    switch (status) {
+    switch (normalizedStatus) {
       case 'accepted':
         return 'Accepted';
       case 'rejected':
@@ -489,6 +631,8 @@ class _TeacherRequestItem {
   _TeacherRequestItem copyWith({String? status}) {
     return _TeacherRequestItem(
       id: id,
+      studentId: studentId,
+      courseId: courseId,
       studentName: studentName,
       courseTitle: courseTitle,
       status: status ?? this.status,
@@ -501,6 +645,9 @@ class _TeacherRequestItem {
   static _TeacherRequestItem fromJson(Map<String, dynamic> json) {
     final student = json['student'];
     final course = json['course'];
+    final studentMap =
+        student is Map<String, dynamic> ? student : <String, dynamic>{};
+    final courseMap = course is Map<String, dynamic> ? course : <String, dynamic>{};
     final payment = json['payment'];
     final paymentMap = payment is Map
         ? Map<String, dynamic>.from(payment)
@@ -556,16 +703,33 @@ class _TeacherRequestItem {
     ]);
     final courseTitle = _firstNonEmptyString(<dynamic>[
       json['courseTitle'],
-      if (course is Map<String, dynamic>) course['title'],
+      courseMap['title'],
       json['courseName'],
+    ]);
+    final studentId = _firstNonEmptyString(<dynamic>[
+      json['studentId'],
+      studentMap['_id'],
+      studentMap['id'],
+      json['userId'],
+    ]);
+    final courseId = _firstNonEmptyString(<dynamic>[
+      json['courseId'],
+      courseMap['_id'],
+      courseMap['id'],
+    ]);
+    final created = _firstNonEmptyString(<dynamic>[
+      json['createdAt'],
+      json['updatedAt'],
+      json['requestedAt'],
     ]);
     return _TeacherRequestItem(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      studentId: studentId,
+      courseId: courseId,
       studentName: studentName.isEmpty ? 'Student' : studentName,
       courseTitle: courseTitle.isEmpty ? 'Course' : courseTitle,
       status: json['status']?.toString() ?? 'pending',
-      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
-          DateTime.now(),
+      createdAt: DateTime.tryParse(created) ?? DateTime.now(),
       isDeleted: json['isDeleted'] == true ||
           json['deleted'] == true ||
           (json['status']?.toString().toLowerCase() == 'deleted'),

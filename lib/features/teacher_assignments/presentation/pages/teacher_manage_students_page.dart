@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/services/hive/hive_service.dart';
+import '../../../../core/services/socket/socket_service.dart';
 import '../../../../core/services/teacher/teacher_request_actions_service.dart';
 
 class TeacherManageStudentsPage extends StatefulWidget {
@@ -16,6 +19,10 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
   final ApiClient _apiClient = ApiClient();
   final TeacherRequestActionsService _requestActions =
       TeacherRequestActionsService();
+  final SocketService _socketService = SocketService();
+  Timer? _pollTimer;
+  bool _isFetching = false;
+  final Set<String> _mutatingRequestIds = <String>{};
   bool _isLoading = false;
   String? _errorMessage;
   final List<_StudentItem> _students = [];
@@ -24,14 +31,49 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadData(showLoading: true);
+    _startPolling();
+    _initSocket();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _loadData(showLoading: false);
     });
+  }
+
+  void _initSocket() {
+    _socketService.connect();
+    _socketService.joinUser();
+    _socketService.onNotificationNew(_handleNotificationNew);
+  }
+
+  void _handleNotificationNew(dynamic payload) {
+    if (!mounted) {
+      return;
+    }
+    _loadData(showLoading: false);
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _socketService.offNotificationNew(_handleNotificationNew);
+    super.dispose();
+  }
+
+  Future<void> _loadData({required bool showLoading}) async {
+    if (_isFetching) {
+      return;
+    }
+    _isFetching = true;
+    if (showLoading && mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       await Future.wait([
@@ -51,9 +93,12 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
         });
       }
     } finally {
+      _isFetching = false;
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          if (showLoading) {
+            _isLoading = false;
+          }
         });
       }
     }
@@ -68,19 +113,23 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
     if (data is! List) {
       return;
     }
-    final mapped = data
+    final accepted = data
         .whereType<Map<String, dynamic>>()
         .map(_TeacherRequestItem.fromJson)
-        .where((item) => item.status == 'accepted' && !item.isDeleted)
-        .map(
-          (request) => _StudentItem(
-            id: request.id,
-            name: request.studentName,
-            course: request.courseTitle,
-            status: 'Active',
-          ),
-        )
+        .where((item) => item.normalizedStatus == 'accepted' && !item.isDeleted)
         .toList();
+
+    final unique = <String, _StudentItem>{};
+    for (final request in accepted) {
+      final key = '${request.studentId}::${request.courseId}::${request.courseTitle.toLowerCase()}';
+      unique[key] = _StudentItem(
+        id: request.studentId.isNotEmpty ? request.studentId : request.id,
+        name: request.studentName,
+        course: request.courseTitle,
+        status: 'Active',
+      );
+    }
+    final mapped = unique.values.toList();
     _students
       ..clear()
       ..addAll(mapped);
@@ -95,17 +144,35 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
     if (data is! List) {
       return;
     }
-    final mapped = data
+    final pending = data
         .whereType<Map<String, dynamic>>()
         .map(_TeacherRequestItem.fromJson)
-        .where((item) => item.status == 'pending' && !item.isDeleted)
-        .toList();
+        .where((item) => item.isPending && !item.isDeleted)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    final unique = <String, _TeacherRequestItem>{};
+    for (final request in pending) {
+      final key = '${request.studentId}::${request.courseId}::${request.courseTitle.toLowerCase()}';
+      final existing = unique[key];
+      if (existing == null || request.createdAt.isAfter(existing.createdAt)) {
+        unique[key] = request;
+      }
+    }
+    final mapped = unique.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _requests
       ..clear()
       ..addAll(mapped);
   }
 
   Future<void> _updateRequestStatus(_TeacherRequestItem request, String status) async {
+    if (_mutatingRequestIds.contains(request.id)) {
+      return;
+    }
+    setState(() {
+      _mutatingRequestIds.add(request.id);
+    });
     try {
       await _requestActions.updateStatus(
         requestId: request.id,
@@ -121,10 +188,7 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Request $status.')),
       );
-      await _loadStudents();
-      if (mounted) {
-        setState(() {});
-      }
+      await _loadData(showLoading: false);
     } on HttpException catch (err) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -137,10 +201,22 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
           const SnackBar(content: Text('Unable to update request.')),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _mutatingRequestIds.remove(request.id);
+        });
+      }
     }
   }
 
   Future<void> _deleteRequest(_TeacherRequestItem request) async {
+    if (_mutatingRequestIds.contains(request.id)) {
+      return;
+    }
+    setState(() {
+      _mutatingRequestIds.add(request.id);
+    });
     try {
       await _requestActions.deleteRequest(
         requestId: request.id,
@@ -163,6 +239,12 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to delete request.')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _mutatingRequestIds.remove(request.id);
+        });
       }
     }
   }
@@ -327,7 +409,9 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => _updateRequestStatus(request, 'rejected'),
+                          onPressed: _mutatingRequestIds.contains(request.id)
+                              ? null
+                              : () => _updateRequestStatus(request, 'rejected'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.textPrimary,
                             side: const BorderSide(color: AppColors.divider),
@@ -341,7 +425,9 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _updateRequestStatus(request, 'accepted'),
+                          onPressed: _mutatingRequestIds.contains(request.id)
+                              ? null
+                              : () => _updateRequestStatus(request, 'accepted'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.teacherPrimary,
                             foregroundColor: AppColors.buttonText,
@@ -354,7 +440,9 @@ class _TeacherManageStudentsPageState extends State<TeacherManageStudentsPage> {
                       ),
                       const SizedBox(width: 12),
                       IconButton(
-                        onPressed: () => _deleteRequest(request),
+                        onPressed: _mutatingRequestIds.contains(request.id)
+                            ? null
+                            : () => _deleteRequest(request),
                         icon: const Icon(Icons.delete_outline),
                         color: AppColors.textSecondary,
                       ),
@@ -489,24 +577,49 @@ class _StudentItem {
 
 class _TeacherRequestItem {
   final String id;
+  final String studentId;
+  final String courseId;
   final String studentName;
   final String courseTitle;
   final String status;
+  final DateTime createdAt;
   final bool isDeleted;
 
   const _TeacherRequestItem({
     required this.id,
+    required this.studentId,
+    required this.courseId,
     required this.studentName,
     required this.courseTitle,
     required this.status,
+    required this.createdAt,
     required this.isDeleted,
   });
+
+  String get normalizedStatus => status.trim().toLowerCase();
+  bool get isPending => normalizedStatus == 'pending';
 
   static _TeacherRequestItem fromJson(Map<String, dynamic> json) {
     final student = json['student'];
     final course = json['course'];
+    final studentMap =
+        student is Map<String, dynamic> ? student : <String, dynamic>{};
+    final courseMap = course is Map<String, dynamic> ? course : <String, dynamic>{};
+    final studentId = studentMap['_id']?.toString() ??
+        studentMap['id']?.toString() ??
+        json['studentId']?.toString() ??
+        '';
+    final courseId = courseMap['_id']?.toString() ??
+        courseMap['id']?.toString() ??
+        json['courseId']?.toString() ??
+        '';
+    final createdRaw = json['createdAt']?.toString() ??
+        json['updatedAt']?.toString() ??
+        '';
     return _TeacherRequestItem(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      studentId: studentId,
+      courseId: courseId,
       studentName: student is Map<String, dynamic>
           ? student['name']?.toString() ?? 'Student'
           : 'Student',
@@ -514,6 +627,7 @@ class _TeacherRequestItem {
           ? course['title']?.toString() ?? 'Course'
           : 'Course',
       status: json['status']?.toString() ?? 'pending',
+      createdAt: DateTime.tryParse(createdRaw) ?? DateTime.now(),
       isDeleted: json['isDeleted'] == true ||
           json['deleted'] == true ||
           (json['status']?.toString().toLowerCase() == 'deleted'),
