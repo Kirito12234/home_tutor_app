@@ -326,6 +326,11 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
         'price': draft['price'],
         'lessonCount': draft['lessonCount'],
         'imageUrl': imagePath,
+        'coursePdfPath': (draft['coursePdfPath']?.toString() ??
+                (draft['coursePdf'] is Map
+                    ? (draft['coursePdf']['path']?.toString() ?? '')
+                    : ''))
+            .toString(),
         'isLocalOnly': true,
       };
     }).toList();
@@ -390,7 +395,7 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
               : approvalStatus == 'rejected'
                   ? 'Rejected'
                   : 'Pending Admin';
-          return {
+           return {
             '_id': course['_id']?.toString() ?? course['id']?.toString() ?? '',
             'id': course['_id']?.toString() ?? course['id']?.toString() ?? '',
             'title': course['title']?.toString() ?? 'Untitled course',
@@ -408,13 +413,19 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
             'status': statusLabel,
             'schedule': scheduleLabel,
             'features': featuresLabel,
-            'price': course['price'],
-            'lessonCount': course['lessonCount'],
-            'imageUrl': course['imageUrl']?.toString() ??
-                course['image']?.toString() ??
-                '',
-          };
-        }).toList();
+             'price': course['price'],
+             'lessonCount': course['lessonCount'],
+             'imageUrl': course['imageUrl']?.toString() ??
+                 course['image']?.toString() ??
+                 '',
+             'coursePdfPath': course['coursePdfPath']?.toString() ??
+                 course['pdfUrl']?.toString() ??
+                 course['pdf']?.toString() ??
+                 course['coursePdfUrl']?.toString() ??
+                 course['coursePdf']?.toString() ??
+                 '',
+           };
+         }).toList();
         _setStateIfMounted(() {
           _courses = [...localCourses, ...mapped];
         });
@@ -750,8 +761,15 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
                         child: Row(
                           children: [
                             _CourseImage(
-                                url: _resolveAssetUrl(
-                                    course['imageUrl']?.toString())),
+                              imageUrl: _resolveAssetUrl(
+                                course['imageUrl']?.toString(),
+                              ),
+                              pdfUrl: _resolveAssetUrl(
+                                course['coursePdfPath']?.toString() ??
+                                    course['pdfUrl']?.toString() ??
+                                    course['pdf']?.toString(),
+                              ),
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -874,20 +892,38 @@ class _TeacherCoursesPageState extends State<TeacherCoursesPage> {
 }
 
 String _resolveAssetUrl(String? raw) {
-  if (raw == null || raw.isEmpty) {
+  if (raw == null) {
     return '';
   }
-  if (_isLocalFilePath(raw)) {
-    return raw;
+  var value = raw.trim();
+  if (value.isEmpty) {
+    return '';
   }
-  if (raw.startsWith('http://') || raw.startsWith('https://')) {
-    return raw;
+  if (_isLocalFilePath(value)) {
+    return value;
+  }
+  value = value.replaceAll('\\', '/');
+  if (value.startsWith('/api/v1/uploads/') ||
+      value.startsWith('/api/v1/public/') ||
+      value.startsWith('/api/v1/static/') ||
+      value.startsWith('/api/v1/files/') ||
+      value.startsWith('/api/v1/media/')) {
+    value = value.substring('/api/v1'.length);
+  } else if (value.startsWith('api/v1/uploads/') ||
+      value.startsWith('api/v1/public/') ||
+      value.startsWith('api/v1/static/') ||
+      value.startsWith('api/v1/files/') ||
+      value.startsWith('api/v1/media/')) {
+    value = value.substring('api/v1'.length);
+  }
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value;
   }
   final base = socketBaseUrl();
-  if (raw.startsWith('/')) {
-    return '$base$raw';
+  if (value.startsWith('/')) {
+    return '$base$value';
   }
-  return '$base/$raw';
+  return '$base/$value';
 }
 
 bool _isLocalFilePath(String value) {
@@ -899,13 +935,14 @@ bool _isLocalFilePath(String value) {
 }
 
 class _CourseImage extends StatelessWidget {
-  const _CourseImage({required this.url});
+  const _CourseImage({required this.imageUrl, required this.pdfUrl});
 
-  final String url;
+  final String imageUrl;
+  final String pdfUrl;
 
   @override
   Widget build(BuildContext context) {
-    if (url.isEmpty) {
+    if (imageUrl.isEmpty) {
       return Container(
         width: 56,
         height: 56,
@@ -913,15 +950,15 @@ class _CourseImage extends StatelessWidget {
           color: AppColors.teacherChip,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(
-          Icons.play_lesson,
+        child: Icon(
+          pdfUrl.isNotEmpty ? Icons.picture_as_pdf_outlined : Icons.play_lesson,
           color: AppColors.teacherPrimaryDark,
         ),
       );
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: _isLocalFilePath(url)
+      child: _isLocalFilePath(imageUrl)
           ? (kIsWeb
               ? Container(
                   width: 56,
@@ -934,7 +971,7 @@ class _CourseImage extends StatelessWidget {
                       color: AppColors.teacherMuted),
                 )
               : platformFileImage(
-                  url.replaceFirst('file://', ''),
+                  imageUrl.replaceFirst('file://', ''),
                   width: 56,
                   height: 56,
                   fit: BoxFit.cover,
@@ -950,7 +987,7 @@ class _CourseImage extends StatelessWidget {
                   ),
                 ))
           : Image.network(
-              url,
+              imageUrl,
               width: 56,
               height: 56,
               fit: BoxFit.cover,

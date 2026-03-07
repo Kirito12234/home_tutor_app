@@ -141,20 +141,38 @@ class _TeacherManageCurriculumPageState
   }
 
   String _resolveAssetUrl(String? raw) {
-    if (raw == null || raw.isEmpty) {
+    if (raw == null) {
       return '';
     }
-    if (_isLocalFilePath(raw)) {
-      return raw;
+    var value = raw.trim();
+    if (value.isEmpty) {
+      return '';
     }
-    if (raw.startsWith('http://') || raw.startsWith('https://')) {
-      return raw;
+    if (_isLocalFilePath(value)) {
+      return value;
+    }
+    value = value.replaceAll('\\', '/');
+    if (value.startsWith('/api/v1/uploads/') ||
+        value.startsWith('/api/v1/public/') ||
+        value.startsWith('/api/v1/static/') ||
+        value.startsWith('/api/v1/files/') ||
+        value.startsWith('/api/v1/media/')) {
+      value = value.substring('/api/v1'.length);
+    } else if (value.startsWith('api/v1/uploads/') ||
+        value.startsWith('api/v1/public/') ||
+        value.startsWith('api/v1/static/') ||
+        value.startsWith('api/v1/files/') ||
+        value.startsWith('api/v1/media/')) {
+      value = value.substring('api/v1'.length);
+    }
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
     }
     final base = socketBaseUrl();
-    if (raw.startsWith('/')) {
-      return '$base$raw';
+    if (value.startsWith('/')) {
+      return '$base$value';
     }
-    return '$base/$raw';
+    return '$base/$value';
   }
 
   bool _isLocalFilePath(String value) {

@@ -264,20 +264,38 @@ class _TeacherCourseDetailPageState extends State<TeacherCourseDetailPage> {
   }
 
   String _resolveAssetUrl(String? raw) {
-    if (raw == null || raw.isEmpty) {
+    if (raw == null) {
       return '';
     }
-    if (_isLocalFilePath(raw)) {
-      return raw;
+    var value = raw.trim();
+    if (value.isEmpty) {
+      return '';
     }
-    if (raw.startsWith('http://') || raw.startsWith('https://')) {
-      return raw;
+    if (_isLocalFilePath(value)) {
+      return value;
+    }
+    value = value.replaceAll('\\', '/');
+    if (value.startsWith('/api/v1/uploads/') ||
+        value.startsWith('/api/v1/public/') ||
+        value.startsWith('/api/v1/static/') ||
+        value.startsWith('/api/v1/files/') ||
+        value.startsWith('/api/v1/media/')) {
+      value = value.substring('/api/v1'.length);
+    } else if (value.startsWith('api/v1/uploads/') ||
+        value.startsWith('api/v1/public/') ||
+        value.startsWith('api/v1/static/') ||
+        value.startsWith('api/v1/files/') ||
+        value.startsWith('api/v1/media/')) {
+      value = value.substring('api/v1'.length);
+    }
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
     }
     final base = socketBaseUrl();
-    if (raw.startsWith('/')) {
-      return '$base$raw';
+    if (value.startsWith('/')) {
+      return '$base$value';
     }
-    return '$base/$raw';
+    return '$base/$value';
   }
 
   bool _isLocalFilePath(String value) {
@@ -1283,6 +1301,16 @@ class _TeacherCourseDetailPageState extends State<TeacherCourseDetailPage> {
           _course['image']?.toString() ??
           widget.course?['imageUrl']?.toString(),
     );
+    final coursePdfUrl = _resolveAssetUrl(
+      _course['coursePdfPath']?.toString() ??
+          _course['pdfUrl']?.toString() ??
+          _course['pdf']?.toString() ??
+          _course['coursePdfUrl']?.toString() ??
+          _course['coursePdf']?.toString() ??
+          widget.course?['coursePdfPath']?.toString() ??
+          widget.course?['pdfUrl']?.toString() ??
+          widget.course?['pdf']?.toString(),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.teacherBackground,
@@ -1380,7 +1408,33 @@ class _TeacherCourseDetailPageState extends State<TeacherCourseDetailPage> {
                                 alignment: Alignment.center,
                                 child: const Icon(Icons.image_not_supported),
                               ),
-                            ),
+                              ),
+                    )
+                  else if (coursePdfUrl.isNotEmpty)
+                    InkWell(
+                      onTap: () => _openMaterial(
+                        _MaterialItem(
+                          title: 'Course PDF',
+                          url: coursePdfUrl,
+                          type: _MaterialType.pdf,
+                          lessonTitle: 'Course',
+                        ),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 110,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: AppColors.teacherChip,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.picture_as_pdf_outlined,
+                          size: 42,
+                          color: AppColors.teacherPrimaryDark,
+                        ),
+                      ),
                     )
                   else
                     Container(

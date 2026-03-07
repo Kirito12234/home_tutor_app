@@ -64,15 +64,36 @@ class _TeacherScheduleSessionPageState extends State<TeacherScheduleSessionPage>
     } finally {
       if (mounted) {
         setState(() {
-          _selectedCourseId =
-              _selectedCourseId ?? (_courses.isNotEmpty ? _courses.first.id : null);
-          _selectedStudentId =
-              _selectedStudentId ?? (_students.isNotEmpty ? _students.first.id : null);
+          final selectedCourseExists = _selectedCourseId != null &&
+              _courses.any((course) => course.id == _selectedCourseId);
+          _selectedCourseId = selectedCourseExists
+              ? _selectedCourseId
+              : (_courses.isNotEmpty ? _courses.first.id : null);
+
+          final selectedStudentExists = _selectedStudentId != null &&
+              _students.any((student) => student.id == _selectedStudentId);
+          _selectedStudentId = selectedStudentExists
+              ? _selectedStudentId
+              : (_students.isNotEmpty ? _students.first.id : null);
           _errorMessage = warning;
           _isLoading = false;
         });
       }
     }
+  }
+
+  List<T> _dedupeById<T>(List<T> items, String Function(T) idOf) {
+    final seen = <String>{};
+    final unique = <T>[];
+    for (final item in items) {
+      final id = idOf(item).trim();
+      if (id.isEmpty || seen.contains(id)) {
+        continue;
+      }
+      seen.add(id);
+      unique.add(item);
+    }
+    return unique;
   }
 
   Future<void> _loadCourses() async {
@@ -98,7 +119,7 @@ class _TeacherScheduleSessionPageState extends State<TeacherScheduleSessionPage>
 
     _courses
       ..clear()
-      ..addAll(mapped);
+      ..addAll(_dedupeById<_CourseOption>(mapped, (course) => course.id));
   }
 
   Future<void> _loadStudents() async {
@@ -130,10 +151,12 @@ class _TeacherScheduleSessionPageState extends State<TeacherScheduleSessionPage>
             .map(_StudentOption.fromJson)
             .where((student) => student.id.isNotEmpty)
             .toList();
-        if (mapped.isNotEmpty || path.contains('teacher-requests')) {
+        final unique =
+            _dedupeById<_StudentOption>(mapped, (student) => student.id);
+        if (unique.isNotEmpty || path.contains('teacher-requests')) {
           _students
             ..clear()
-            ..addAll(mapped);
+            ..addAll(unique);
           return;
         }
       } on HttpException catch (err) {
@@ -412,7 +435,19 @@ class _TeacherScheduleSessionPageState extends State<TeacherScheduleSessionPage>
 
   @override
   Widget build(BuildContext context) {
-    final selectedCourse = _courses.where((item) => item.id == _selectedCourseId).cast<_CourseOption?>().firstWhere(
+    final courseDropdownValue = _selectedCourseId != null &&
+            _courses.any((course) => course.id == _selectedCourseId)
+        ? _selectedCourseId
+        : null;
+    final studentDropdownValue = _selectedStudentId != null &&
+            _students.any((student) => student.id == _selectedStudentId)
+        ? _selectedStudentId
+        : null;
+
+    final selectedCourse = _courses
+        .where((item) => item.id == courseDropdownValue)
+        .cast<_CourseOption?>()
+        .firstWhere(
           (item) => item != null,
           orElse: () => null,
         );
@@ -517,7 +552,7 @@ class _TeacherScheduleSessionPageState extends State<TeacherScheduleSessionPage>
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          initialValue: _selectedCourseId,
+                          initialValue: courseDropdownValue,
                           decoration: _fieldDecoration('Select course'),
                           items: _courses
                               .map(
@@ -542,7 +577,7 @@ class _TeacherScheduleSessionPageState extends State<TeacherScheduleSessionPage>
                       const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          initialValue: _selectedStudentId,
+                          initialValue: studentDropdownValue,
                           decoration: _fieldDecoration('Select student'),
                           items: _students
                               .map(

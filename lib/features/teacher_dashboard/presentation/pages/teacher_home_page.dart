@@ -145,6 +145,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
             price: (course['price'] as num?)?.toDouble() ?? 0,
             lessonCount: resolvedLessonCount,
             imageUrl: _extractCourseImageUrl(course),
+            coursePdfUrl: _extractCoursePdfUrl(course),
             features: course['features'],
           );
         }).toList();
@@ -204,6 +205,40 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       fromDynamic(course['thumbnail']),
       fromDynamic(course['coverImage']),
       fromDynamic(course['cover']),
+    ];
+    return candidates.firstWhere((e) => e.trim().isNotEmpty, orElse: () => '');
+  }
+
+  String _extractCoursePdfUrl(Map<String, dynamic> course) {
+    String fromDynamic(dynamic raw) {
+      if (raw == null) {
+        return '';
+      }
+      if (raw is String) {
+        return raw.trim();
+      }
+      if (raw is Map<String, dynamic>) {
+        final candidates = <String>[
+          raw['url']?.toString() ?? '',
+          raw['path']?.toString() ?? '',
+          raw['src']?.toString() ?? '',
+          raw['pdfUrl']?.toString() ?? '',
+          raw['coursePdfPath']?.toString() ?? '',
+        ];
+        return candidates.firstWhere(
+          (e) => e.trim().isNotEmpty,
+          orElse: () => '',
+        );
+      }
+      return '';
+    }
+
+    final candidates = <String>[
+      fromDynamic(course['coursePdfPath']),
+      fromDynamic(course['pdfUrl']),
+      fromDynamic(course['pdf']),
+      fromDynamic(course['coursePdfUrl']),
+      fromDynamic(course['coursePdf']),
     ];
     return candidates.firstWhere((e) => e.trim().isNotEmpty, orElse: () => '');
   }
@@ -1017,6 +1052,7 @@ class _CourseInfo {
   final double price;
   final int lessonCount;
   final String imageUrl;
+  final String coursePdfUrl;
   final dynamic features;
 
   const _CourseInfo({
@@ -1033,6 +1069,7 @@ class _CourseInfo {
     required this.price,
     required this.lessonCount,
     required this.imageUrl,
+    required this.coursePdfUrl,
     required this.features,
   });
 
@@ -1055,6 +1092,7 @@ class _CourseInfo {
       'price': price,
       'lessonCount': lessonCount,
       'imageUrl': imageUrl,
+      'coursePdfPath': coursePdfUrl,
       'features': features,
     };
   }
@@ -1072,6 +1110,7 @@ class _CourseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedImageUrl = _resolveAssetUrl(info.imageUrl);
+    final resolvedPdfUrl = _resolveAssetUrl(info.coursePdfUrl);
     final isLocal = _isLocalFilePath(resolvedImageUrl);
     return GestureDetector(
       onTap: onTap,
@@ -1099,8 +1138,10 @@ class _CourseCard extends StatelessWidget {
                       height: 62,
                       width: double.infinity,
                       color: AppColors.teacherChip,
-                      child: const Icon(
-                        Icons.play_lesson,
+                      child: Icon(
+                        resolvedPdfUrl.isNotEmpty
+                            ? Icons.picture_as_pdf_outlined
+                            : Icons.play_lesson,
                         color: AppColors.teacherPrimaryDark,
                         size: 24,
                       ),
@@ -1207,20 +1248,38 @@ class _CourseCard extends StatelessWidget {
 }
 
 String _resolveAssetUrl(String? raw) {
-  if (raw == null || raw.isEmpty) {
+  if (raw == null) {
     return '';
   }
-  if (_isLocalFilePath(raw)) {
-    return raw;
+  var value = raw.trim();
+  if (value.isEmpty) {
+    return '';
   }
-  if (raw.startsWith('http://') || raw.startsWith('https://')) {
-    return raw;
+  if (_isLocalFilePath(value)) {
+    return value;
+  }
+  value = value.replaceAll('\\', '/');
+  if (value.startsWith('/api/v1/uploads/') ||
+      value.startsWith('/api/v1/public/') ||
+      value.startsWith('/api/v1/static/') ||
+      value.startsWith('/api/v1/files/') ||
+      value.startsWith('/api/v1/media/')) {
+    value = value.substring('/api/v1'.length);
+  } else if (value.startsWith('api/v1/uploads/') ||
+      value.startsWith('api/v1/public/') ||
+      value.startsWith('api/v1/static/') ||
+      value.startsWith('api/v1/files/') ||
+      value.startsWith('api/v1/media/')) {
+    value = value.substring('api/v1'.length);
+  }
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value;
   }
   final base = socketBaseUrl();
-  if (raw.startsWith('/')) {
-    return '$base$raw';
+  if (value.startsWith('/')) {
+    return '$base$value';
   }
-  return '$base/$raw';
+  return '$base/$value';
 }
 
 bool _isLocalFilePath(String value) {
