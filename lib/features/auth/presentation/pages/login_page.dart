@@ -1,33 +1,93 @@
-import 'dart:io';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../../app/routes/app_routes.dart';
 import '../../../../../app/theme/app_colors.dart';
+import '../../../../../core/api/api_endpoints.dart';
 import '../../../../../core/widgets/app_text_field.dart';
 import '../../../../../core/widgets/primary_button.dart';
 import '../../../../../core/widgets/social_button.dart';
-import '../../../../../core/api/api_client.dart';
 import '../../../../../core/services/hive/hive_service.dart';
+import '../providers/auth_providers.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerStatefulWidget {
   final String? role;
 
   const LoginPage({Key? key, this.role}) : super(key: key);
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final ApiClient _apiClient = ApiClient();
+  ProviderSubscription<dynamic>? _authListener;
   bool _obscurePassword = true;
-  bool _isLoading = false;
-  String? _errorMessage;
   String _roleLabel = 'Student';
+  String get _effectiveApiBaseUrl => apiBaseUrl();
+
+  Future<void> _onGoogleLogin() async {
+    await _startSocialLogin('google');
+  }
+
+  Future<void> _onFacebookLogin() async {
+    await _startSocialLogin('facebook');
+  }
+
+  Future<void> _startSocialLogin(String provider) async {
+    final base = socketBaseUrl();
+    final candidates = <Uri>[
+      Uri.parse('$base/auth/$provider'),
+      Uri.parse('$base/api/v1/auth/$provider'),
+    ];
+
+    bool launched = false;
+    for (final uri in candidates) {
+      try {
+        final didLaunch = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (didLaunch) {
+          launched = true;
+          break;
+        }
+      } catch (_) {
+        // Try next candidate.
+      }
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (!launched) {
+      _showError(
+        'Social login is not configured for this server (${socketBaseUrl()}). '
+        'Ask your backend to provide an OAuth route like /auth/$provider (or /api/v1/auth/$provider).',
+      );
+      return;
+    }
+
+    final dialogContext = context;
+    showDialog<void>(
+      context: dialogContext,
+      builder: (context) => AlertDialog(
+        title: Text('Continue with ${provider[0].toUpperCase()}${provider.substring(1)}'),
+        content: const Text(
+          'Your browser opened to finish sign-in. After you complete it, return to the app.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<bool> _handleBack() async {
     if (Navigator.of(context).canPop()) {
@@ -37,41 +97,23 @@ class _LoginPageState extends State<LoginPage> {
     return false;
   }
 
-  String? _extractDisplayName(Map<String, dynamic> response) {
-    final user = response['user'];
-    if (user is Map<String, dynamic>) {
-      final name = user['name']?.toString();
-      if (name != null && name.trim().isNotEmpty) {
-        return name;
-      }
-    }
-    final name = response['name']?.toString();
-    if (name != null && name.trim().isNotEmpty) {
-      return name;
-    }
-    return null;
-  }
-
-  String? _extractRole(Map<String, dynamic> response) {
-    String? role;
-    final user = response['user'];
-    if (user is Map<String, dynamic>) {
-      role = user['role']?.toString();
-    }
-    role ??= response['role']?.toString();
-    if (role == null || role.trim().isEmpty) {
-      return null;
-    }
-    final normalized = role.trim().toLowerCase();
-    if (normalized == 'tutor') {
-      return 'teacher';
-    }
-    return normalized;
-  }
-
   @override
   void initState() {
     super.initState();
+    _authListener = ref.listenManual(authViewModelProvider, (previous, next) {
+      final message = next.errorMessage;
+      if (message == null ||
+          message.trim().isEmpty ||
+          message == previous?.errorMessage) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    });
     final resolvedRole = widget.role ?? HiveService.currentUserRole;
     if (resolvedRole != null) {
       HiveService.setCurrentUserRole(resolvedRole);
@@ -83,6 +125,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    _authListener?.close();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -93,126 +136,125 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    final identifier = _emailController.text.trim();
+    final fallbackRole =
+        (widget.role ?? HiveService.currentUserRole ?? _roleLabel).toLowerCase();
 
-    try {
-      final identifier = _emailController.text.trim();
-      final online = await _isOnline();
-      if (!online) {
-        await _attemptOfflineLogin(identifier);
-        return;
-      }
+    final session = await ref.read(authViewModelProvider.notifier).login(
+          identifier: identifier,
+          password: _passwordController.text,
+          fallbackRole: fallbackRole,
+        );
 
-      final response = await _apiClient.postJson(
-        '/api/v1/auth/login',
-        body: {
-          'emailOrPhone': identifier,
-          'password': _passwordController.text,
-        },
-      );
-
-      final token = response['token']?.toString();
-      if (token != null && token.isNotEmpty) {
-        await HiveService.setAuthToken(token);
-      }
-      final serverRole = _extractRole(response);
-      if (serverRole != null) {
-        await HiveService.setCurrentUserRole(serverRole);
-      }
-      final displayName =
-          _extractDisplayName(response) ?? identifier;
-      await HiveService.setCurrentUserName(displayName);
-      await HiveService.upsertOfflineCredential(
-        identifier: identifier,
-        passwordHash: HiveService.hashPassword(_passwordController.text),
-        name: displayName,
-        role: (HiveService.currentUserRole ?? _roleLabel).toLowerCase(),
-      );
-
-      if (!mounted) {
-        return;
-      }
-      final role = serverRole ?? HiveService.currentUserRole;
-      Navigator.of(context).pushReplacementNamed(
-        role != null && role.toLowerCase() == 'teacher'
-            ? AppRoutes.teacherHome
-            : AppRoutes.home,
-      );
-    } on SocketException {
-      await _attemptOfflineLogin(_emailController.text.trim());
-    } on HttpException catch (err) {
-      _showError(err.message);
-    } catch (_) {
-      _showError('Unable to log in. Please try again.');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<bool> _isOnline() async {
-    try {
-      final results = await Connectivity().checkConnectivity();
-      return results.any((item) => item != ConnectivityResult.none);
-    } catch (_) {
-      // If connectivity plugin fails, continue with network request.
-      return true;
-    }
-  }
-
-  Future<void> _attemptOfflineLogin(String identifier) async {
-    final credential = HiveService.getOfflineCredential(identifier);
-    if (credential == null) {
-      _showError('No offline account found for this user.');
+    if (!mounted || session == null) {
       return;
     }
-    final storedHash = credential['passwordHash']?.toString();
-    final inputHash = HiveService.hashPassword(_passwordController.text);
-    if (storedHash == null || storedHash != inputHash) {
-      _showError('Incorrect offline password.');
-      return;
-    }
-    final name = credential['name']?.toString();
-    final role = credential['role']?.toString();
-    await HiveService.setAuthToken(null);
-    await HiveService.setCurrentUserName(name ?? identifier);
-    if (role != null && role.trim().isNotEmpty) {
-      await HiveService.setCurrentUserRole(role);
-    }
-    if (!mounted) {
-      return;
-    }
-    final resolvedRole = role ?? HiveService.currentUserRole;
+
+    final resolvedRole =
+        (session.role ?? HiveService.currentUserRole)?.toLowerCase();
     Navigator.of(context).pushReplacementNamed(
       resolvedRole != null && resolvedRole.toLowerCase() == 'teacher'
           ? AppRoutes.teacherHome
           : AppRoutes.home,
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Offline login used.')),
-    );
+    if (session.token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Offline login used.')),
+      );
+    }
   }
 
   void _showError(String message) {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _errorMessage = message;
-    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
   }
 
+  void _showSnack(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _showApiServerDialog() async {
+    final controller = TextEditingController(
+      text: HiveService.apiBaseUrlOverride ?? '',
+    );
+    final current = _effectiveApiBaseUrl;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('API server'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Current: $current',
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Override (optional)',
+                  hintText: 'http://192.168.1.10:5000',
+                ),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Tip: 10.0.2.2 works only on Android emulator. For a real phone, use your PC/server LAN IP or a public domain.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                await HiveService.setApiBaseUrlOverride(null);
+                if (context.mounted) {
+                  navigator.pop();
+                }
+              },
+              child: const Text('Use default'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final next = controller.text.trim();
+                final navigator = Navigator.of(context);
+                await HiveService.setApiBaseUrlOverride(next.isEmpty ? null : next);
+                if (!context.mounted) {
+                  return;
+                }
+                navigator.pop();
+                setState(() {});
+                _showSnack('API server updated: ${apiBaseUrl()}');
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authViewModelProvider);
     return WillPopScope(
       onWillPop: _handleBack,
       child: Scaffold(
@@ -223,12 +265,20 @@ class _LoginPageState extends State<LoginPage> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
             onPressed: () async {
+              final navigator = Navigator.of(context);
               final canPop = await _handleBack();
-              if (canPop && mounted) {
-                Navigator.of(context).pop();
+              if (canPop && context.mounted) {
+                navigator.pop();
               }
             },
           ),
+          actions: [
+            IconButton(
+              tooltip: 'API server',
+              icon: const Icon(Icons.cloud_outlined, color: AppColors.textPrimary),
+              onPressed: _showApiServerDialog,
+            ),
+          ],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -309,12 +359,12 @@ class _LoginPageState extends State<LoginPage> {
                   PrimaryButton(
                     text: 'Log In',
                     onPressed: _onLogin,
-                    isLoading: _isLoading,
+                    isLoading: authState.isLoading,
                   ),
-                  if (_errorMessage != null) ...[
+                  if (authState.errorMessage != null) ...[
                     const SizedBox(height: 16),
                     Text(
-                      _errorMessage!,
+                      authState.errorMessage!,
                       style: const TextStyle(
                         color: Colors.redAccent,
                         fontSize: 14,
@@ -346,15 +396,17 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       SocialButton(
                         iconPath: 'assets/icons/google.svg',
+                        semanticLabel: 'Continue with Google',
                         onPressed: () {
-                          // Handle Google login
+                          _onGoogleLogin();
                         },
                       ),
                       const SizedBox(width: 24),
                       SocialButton(
                         iconPath: 'assets/icons/facebook.svg',
+                        semanticLabel: 'Continue with Facebook',
                         onPressed: () {
-                          // Handle Facebook login
+                          _onFacebookLogin();
                         },
                       ),
                     ],
