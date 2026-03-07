@@ -55,7 +55,8 @@ import '../features/teacher_attendance/presentation/pages/teacher_student_logins
 import '../features/teacher_courses/presentation/pages/teacher_course_detail_page.dart';
 import '../features/teacher_courses/presentation/pages/teacher_manage_curriculum_page.dart';
 import '../features/teacher_profile/presentation/pages/teacher_student_profile_page.dart';
-import '../features/sensors/presentation/widgets/sensor_warning_widget.dart';
+import '../core/sensors/widgets/sensor_warning_widget.dart';
+import '../core/sensors/shake_detector_wrapper.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -85,6 +86,7 @@ class MyApp extends StatelessWidget {
           children: [
             child ?? const SizedBox.shrink(),
             const SensorWarningWidget(),
+            const ShakeDetectorWrapper(),
           ],
         );
       },
