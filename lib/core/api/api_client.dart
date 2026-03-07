@@ -12,6 +12,19 @@ class ApiClient {
   final http.Client _client;
   static const Duration _requestTimeout = Duration(seconds: 20);
 
+  String _serverLabel() {
+    final base = apiBaseUrl();
+    try {
+      final uri = Uri.parse(base);
+      if (uri.hasScheme && uri.host.isNotEmpty) {
+        return uri.origin;
+      }
+      return base;
+    } catch (_) {
+      return base;
+    }
+  }
+
   Uri _uri(String path) {
     final base = apiBaseUrl();
     final normalized = path.startsWith('/') ? path : '/$path';
@@ -126,7 +139,10 @@ class ApiClient {
     } on HandshakeException {
       throw HttpException(0, 'Secure connection failed. Please try again.');
     } on TimeoutException {
-      throw HttpException(0, 'Request timeout. Please try again.');
+      throw HttpException(
+        0,
+        'Request timeout. Server: ${_serverLabel()}. If you are on a real device, set the API server to a LAN IP/domain reachable from your phone.',
+      );
     } on http.ClientException catch (err) {
       throw HttpException(0, err.message);
     }
@@ -142,7 +158,10 @@ class ApiClient {
     } on HandshakeException {
       throw HttpException(0, 'Secure connection failed. Please try again.');
     } on TimeoutException {
-      throw HttpException(0, 'Upload timeout. Please try again.');
+      throw HttpException(
+        0,
+        'Upload timeout. Server: ${_serverLabel()}. Please try again.',
+      );
     } on http.ClientException catch (err) {
       throw HttpException(0, err.message);
     }
