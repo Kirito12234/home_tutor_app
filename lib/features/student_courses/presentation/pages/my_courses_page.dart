@@ -3,11 +3,11 @@ import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/services/hive/hive_service.dart';
+import '../../data/models/course_model.dart';
 import '../widgets/my_courses_header.dart';
 import '../widgets/course_progress_tile.dart';
 import '../../../student_dashboard/presentation/widgets/bottom_nav.dart';
 import '../../domain/entities/course.dart';
-import '../../../student_dashboard/domain/entities/lesson.dart';
 
 class MyCoursesPage extends StatefulWidget {
   const MyCoursesPage({Key? key}) : super(key: key);
@@ -68,7 +68,7 @@ class _MyCoursesPageState extends State<MyCoursesPage> {
           final progressPercent = enrollment['progressPercent'];
           final progressValue = progressPercent is num ? progressPercent.toDouble() : 0.0;
           final completed = ((progressValue / 100) * total).round();
-          final courseEntity = _mapCourse(courseMap);
+          final courseEntity = CourseModel.fromJson(courseMap).toEntity();
 
           mapped.add({
             'title': courseEntity.title,
@@ -104,27 +104,6 @@ class _MyCoursesPageState extends State<MyCoursesPage> {
         });
       }
     }
-  }
-
-  Course _mapCourse(Map<String, dynamic> course) {
-    final tutor = course['tutor'];
-    final tutorName =
-        tutor is Map<String, dynamic> ? tutor['name']?.toString() : null;
-    return Course(
-      id: course['_id']?.toString() ?? course['id']?.toString() ?? 'course',
-      title: course['title']?.toString() ?? 'Course',
-      instructor: course['instructorName']?.toString() ?? tutorName ?? 'Instructor',
-      price: (course['price'] as num?)?.toDouble() ?? 0,
-      durationHours: (course['durationHours'] as num?)?.toInt() ?? 0,
-      lessonCount: (course['lessonCount'] as num?)?.toInt() ?? 0,
-      category: course['category']?.toString() ?? 'General',
-      imageUrl: course['imageUrl']?.toString(),
-      description: course['description']?.toString() ?? '',
-      isBestseller: course['isBestseller'] == true,
-      isPopular: course['isPopular'] == true,
-      isNew: course['isNew'] == true,
-      lessons: const <Lesson>[],
-    );
   }
 
   void _onNavTap(int index) {

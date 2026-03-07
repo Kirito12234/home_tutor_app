@@ -175,8 +175,6 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
   Timer? _accessPollTimer;
   _StudentPaymentMethod _selectedPaymentMethod = _StudentPaymentMethod.khalti;
   Map<_StudentPaymentMethod, String> _teacherQrByMethod = {};
-  bool _isFavorite = false;
-  bool _isFavoriteBusy = false;
   List<_CourseMaterialItem> _materials = <_CourseMaterialItem>[];
 
   bool get _isStudent =>
@@ -208,7 +206,6 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
       _course = args;
       _courseCoverUrl = _assetUrl(args.imageUrl);
     });
-    _loadFavoriteStatus(args.id);
     _loadLessons(args.id);
     _loadTeacherPayoutDetails(args.id);
     _checkStudentAccess(args);
@@ -975,146 +972,6 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     throw Exception('File data unavailable');
   }
 
-  Future<void> _loadFavoriteStatus(String courseId) async {
-    final token = HiveService.authToken;
-    if (token == null || token.isEmpty || courseId.isEmpty) {
-      return;
-    }
-    final paths = <String>[
-      '/api/v1/users/me/favorites',
-      '/api/users/me/favorites',
-      '/api/v1/favorites',
-    ];
-    for (final path in paths) {
-      try {
-        final response = await _apiClient.getJson(path, token: token);
-        final data = response['data'];
-        var found = false;
-        if (data is Map<String, dynamic>) {
-          final courses = data['courses'];
-          if (courses is List) {
-            for (final row in courses.whereType<Map<String, dynamic>>()) {
-              final id = row['_id']?.toString() ?? row['id']?.toString() ?? '';
-              if (id == courseId) {
-                found = true;
-                break;
-              }
-            }
-          }
-        } else if (data is List) {
-          for (final row in data.whereType<Map<String, dynamic>>()) {
-            final course = row['course'];
-            final map =
-                course is Map<String, dynamic> ? course : <String, dynamic>{};
-            final id = map['_id']?.toString() ??
-                map['id']?.toString() ??
-                row['_id']?.toString() ??
-                row['id']?.toString() ??
-                '';
-            if (id == courseId) {
-              found = true;
-              break;
-            }
-          }
-        }
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _isFavorite = found;
-        });
-        return;
-      } on HttpException catch (err) {
-        if (err.statusCode == 404 || err.statusCode == 405) {
-          continue;
-        }
-        return;
-      } catch (_) {
-        return;
-      }
-    }
-  }
-
-  Future<void> _toggleFavorite() async {
-    final course = _course;
-    final token = HiveService.authToken;
-    if (course == null || token == null || token.isEmpty || _isFavoriteBusy) {
-      return;
-    }
-    final next = !_isFavorite;
-    setState(() {
-      _isFavoriteBusy = true;
-      _isFavorite = next;
-    });
-    try {
-      if (next) {
-        final paths = <String>[
-          '/api/v1/users/me/favorites/courses/${course.id}',
-          '/api/users/me/favorites/courses/${course.id}',
-          '/api/v1/favorites',
-        ];
-        var ok = false;
-        for (final path in paths) {
-          try {
-            if (path.endsWith('/favorites')) {
-              await _apiClient.postJson(
-                path,
-                token: token,
-                body: {'courseId': course.id},
-              );
-            } else {
-              await _apiClient.postJson(path, token: token, body: const {});
-            }
-            ok = true;
-            break;
-          } on HttpException catch (err) {
-            if (err.statusCode == 404 || err.statusCode == 405) {
-              continue;
-            }
-            rethrow;
-          }
-        }
-        if (!ok) {
-          throw Exception('Unable to add favorite');
-        }
-      } else {
-        final paths = <String>[
-          '/api/v1/users/me/favorites/courses/${course.id}',
-          '/api/users/me/favorites/courses/${course.id}',
-          '/api/v1/favorites/${course.id}',
-        ];
-        var ok = false;
-        for (final path in paths) {
-          try {
-            await _apiClient.deleteJson(path, token: token);
-            ok = true;
-            break;
-          } on HttpException catch (err) {
-            if (err.statusCode == 404 || err.statusCode == 405) {
-              continue;
-            }
-            rethrow;
-          }
-        }
-        if (!ok) {
-          throw Exception('Unable to remove favorite');
-        }
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isFavorite = !_isFavorite;
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isFavoriteBusy = false;
-        });
-      }
-    }
-  }
-
   Future<void> _markLessonCompleted(Lesson lesson) async {
     final course = _course;
     if (course == null || lesson.id.isEmpty) {
@@ -1868,15 +1725,16 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                                   ),
                                 ),
                               ),
-                              Text(
-                                _formatPrice(course.price),
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                  fontFamily: 'OpenSans',
+                              if (course.price > 0)
+                                Text(
+                                  _formatPrice(course.price),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                    fontFamily: 'OpenSans',
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -2196,33 +2054,6 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
             ),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: _isFavoriteBusy ? null : _toggleFavorite,
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: _isFavorite
-                          ? const Color(0xFFFFEEF2)
-                          : AppColors.favoriteOrangeLight,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _isFavorite
-                            ? const Color(0xFFFF5478)
-                            : AppColors.favoriteOrange,
-                        width: 2,
-                      ),
-                    ),
-                    child: Icon(
-                      _isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: _isFavorite
-                          ? const Color(0xFFFF5478)
-                          : AppColors.favoriteOrange,
-                      size: 24,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
                 Expanded(
                   child: _isLockedForStudent
                       ? PrimaryButton(

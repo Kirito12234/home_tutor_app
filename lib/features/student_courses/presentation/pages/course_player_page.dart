@@ -343,24 +343,6 @@ class _CoursePlayerPageState extends State<CoursePlayerPage> {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.favoriteOrangeLight,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.favoriteOrange,
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.star_outline,
-                    color: AppColors.favoriteOrange,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
                 Expanded(
                   child: PrimaryButton(
                     text: 'Buy Now',

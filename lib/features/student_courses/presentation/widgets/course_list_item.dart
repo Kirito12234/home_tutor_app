@@ -166,56 +166,33 @@ class CourseListItem extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                InkWell(
-                  onTap: onFavoriteTap,
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: isFavorite ? const Color(0xFFFFEEF2) : const Color(0xFFF1F4F8),
-                      shape: BoxShape.circle,
+            if (showOpenButton) ...[
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 82,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: onTap,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.buttonText,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                    child: Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                      size: 21,
-                      color: isFavorite ? const Color(0xFFFF5478) : const Color(0xFF7D8AA4),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: const Text(
+                    'Open',
+                    style: TextStyle(
+                      fontSize: 31 / 2,
+                      fontWeight: FontWeight.w400,
+                      fontFamily: 'OpenSans',
                     ),
                   ),
                 ),
-                if (showOpenButton) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: 82,
-                    height: 44,
-                    child: ElevatedButton(
-                      onPressed: onTap,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.buttonText,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                      ),
-                      child: const Text(
-                        'Open',
-                        style: TextStyle(
-                          fontSize: 31 / 2,
-                          fontWeight: FontWeight.w400,
-                          fontFamily: 'OpenSans',
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ],
         ),
       ),

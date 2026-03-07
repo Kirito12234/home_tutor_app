@@ -4,10 +4,10 @@ import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/services/hive/hive_service.dart';
+import '../../data/models/course_model.dart';
 import '../../domain/entities/course.dart';
 import '../widgets/course_list_item.dart';
 import '../widgets/filter_sheet.dart';
-import '../../../student_dashboard/domain/entities/lesson.dart';
 import '../../../student_dashboard/presentation/widgets/bottom_nav.dart';
 
 class SearchResultsPage extends StatefulWidget {
@@ -96,7 +96,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       final mapped = data
           .whereType<Map<String, dynamic>>()
           .where(_isCourseApprovedForStudent)
-          .map(_mapCourse)
+          .map((json) => CourseModel.fromJson(json).toEntity())
           .toList();
       final categories = mapped
           .map((e) => e.category)
@@ -152,29 +152,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     return explicitApproved ||
         approvalStatus == 'approved' ||
         status == 'approved';
-  }
-
-  Course _mapCourse(Map<String, dynamic> course) {
-    final tutor = course['tutor'];
-    final tutorName =
-        tutor is Map<String, dynamic> ? tutor['name']?.toString() : null;
-    final tutorId = tutor is Map<String, dynamic> ? tutor['_id']?.toString() : null;
-    return Course(
-      id: course['_id']?.toString() ?? course['id']?.toString() ?? 'course',
-      title: course['title']?.toString() ?? 'Course',
-      instructor: course['instructorName']?.toString() ?? tutorName ?? 'Instructor',
-      tutorId: tutorId,
-      price: (course['price'] as num?)?.toDouble() ?? 0,
-      durationHours: (course['durationHours'] as num?)?.toInt() ?? 0,
-      lessonCount: (course['lessonCount'] as num?)?.toInt() ?? 0,
-      category: course['category']?.toString() ?? 'General',
-      imageUrl: course['imageUrl']?.toString(),
-      description: course['description']?.toString() ?? '',
-      isBestseller: course['isBestseller'] == true,
-      isPopular: course['isPopular'] == true,
-      isNew: course['isNew'] == true,
-      lessons: const <Lesson>[],
-    );
   }
 
   void _applyFilters() {
