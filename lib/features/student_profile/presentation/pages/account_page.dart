@@ -108,8 +108,6 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _logout() async {
     await HiveService.setAuthToken(null);
     await HiveService.setCurrentUserName(null);
-    await HiveService.setCurrentUserAvatarUrl(null);
-    await HiveService.setCurrentUserAvatarLocalPath(null);
     if (!mounted) {
       return;
     }

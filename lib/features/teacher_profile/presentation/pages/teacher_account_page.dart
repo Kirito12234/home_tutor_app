@@ -95,9 +95,7 @@ class _TeacherAccountPageState extends State<TeacherAccountPage> {
     _profileSyncTimer?.cancel();
     await HiveService.setAuthToken(null);
     await HiveService.setCurrentUserName(null);
-    await HiveService.setCurrentUserAvatarUrl(null);
     await HiveService.setCurrentUserRole('teacher');
-    await HiveService.setCurrentUserAvatarLocalPath(null);
     if (!mounted) {
       return;
     }
